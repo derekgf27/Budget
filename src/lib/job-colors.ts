@@ -9,7 +9,7 @@ export type JobColor = {
 };
 
 export const JOB_COLOR_OPTIONS: JobColor[] = [
-  { key: "forest", label: "Forest", dot: "#0b3d34", bg: "#d9ebe6", text: "#0b3d34" },
+  { key: "forest", label: "Forest", dot: "#243d34", bg: "#d9ebe6", text: "#243d34" },
   { key: "blue", label: "Blue", dot: "#2f6fed", bg: "#dce7fb", text: "#1a4bb8" },
   { key: "ochre", label: "Ochre", dot: "#9a6b16", bg: "#f3e6c8", text: "#6e4c0e" },
   { key: "teal", label: "Teal", dot: "#0f6a6a", bg: "#d4ebea", text: "#0c5252" },

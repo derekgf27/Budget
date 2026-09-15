@@ -12,8 +12,9 @@ import {
   savingsGoals,
   savingsTransfers,
   transactions,
+  accounts,
 } from "@/db/schema";
-import { dollarsToCents } from "@/lib/money";
+import { dollarsToCents, nextPaydayAfter, type Cadence } from "@/lib/money";
 import { isJobColorKey } from "@/lib/job-colors";
 
 function revalidateAll() {
@@ -24,6 +25,7 @@ function revalidateAll() {
   revalidatePath("/savings");
   revalidatePath("/transactions");
   revalidatePath("/accounts");
+  revalidatePath("/settings");
 }
 
 function nextPaydayFromDay(day: number, from = new Date()): string {
@@ -67,6 +69,8 @@ export async function upsertIncome(formData: FormData) {
   }
   const amountRaw = String(formData.get("amount") || "").trim();
   const colorRaw = String(formData.get("colorKey") || "").trim();
+  const depositMatch =
+    String(formData.get("depositMatch") || "").trim() || null;
   const values = {
     name: String(formData.get("name") || "").trim(),
     netAmountCents: amountRaw ? dollarsToCents(amountRaw) : 0,
@@ -75,6 +79,7 @@ export async function upsertIncome(formData: FormData) {
     nextPayday,
     amountVaries: formData.get("amountVaries") === "on",
     colorKey: isJobColorKey(colorRaw) ? colorRaw : "forest",
+    depositMatch,
   };
   if (!values.name || !values.nextPayday) {
     throw new Error("Name and next payday are required");
@@ -128,11 +133,26 @@ export async function logPaycheck(formData: FormData) {
     });
   }
 
-  // Keep estimate in sync with latest actual when amount varies
-  await db
-    .update(incomeSources)
-    .set({ netAmountCents: amountCents })
+  // Keep estimate + schedule in sync with what actually paid
+  const [job] = await db
+    .select()
+    .from(incomeSources)
     .where(eq(incomeSources.id, incomeSourceId));
+  if (job) {
+    const advanced = nextPaydayAfter(
+      paidOn,
+      job.cadence as Cadence,
+      job.nextPayday,
+    );
+    const nextPayday =
+      advanced > job.nextPayday || job.nextPayday <= paidOn
+        ? advanced
+        : job.nextPayday;
+    await db
+      .update(incomeSources)
+      .set({ netAmountCents: amountCents, nextPayday })
+      .where(eq(incomeSources.id, incomeSourceId));
+  }
 
   revalidateAll();
 }
@@ -195,6 +215,8 @@ export async function markBillPaid(formData: FormData) {
   if (!existing[0]) {
     await db.insert(billPayments).values({ billId, dueDate, paidOn });
   }
+  const { tidyTransactionsForSpend } = await import("@/lib/spend-tidy");
+  await tidyTransactionsForSpend();
   revalidateAll();
 }
 
@@ -216,9 +238,12 @@ export async function markBillUnpaid(formData: FormData) {
 export async function upsertCategory(formData: FormData) {
   const db = getDb();
   const id = String(formData.get("id") || "");
+  const rawColor = String(formData.get("colorKey") || "").trim();
+  const { isCategoryColorKey } = await import("@/lib/category-colors");
   const values = {
     name: String(formData.get("name") || "").trim(),
     monthlyLimitCents: dollarsToCents(String(formData.get("limit") || "0")),
+    colorKey: isCategoryColorKey(rawColor) ? rawColor : null,
   };
   if (!values.name) throw new Error("Name is required");
   if (id) {
@@ -336,4 +361,82 @@ export async function updateTransactionCategory(formData: FormData) {
       .where(eq(transactions.id, id));
   }
   revalidateAll();
+}
+
+export async function renameAccount(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  const displayName = String(formData.get("displayName") || "").trim() || null;
+  if (!id) throw new Error("Account required");
+  await db.update(accounts).set({ displayName }).where(eq(accounts.id, id));
+  revalidateAll();
+}
+
+export async function updateAccountBalance(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  const raw = String(formData.get("balance") || "").trim();
+  if (!id) throw new Error("Account required");
+  const balanceCurrent = raw === "" ? null : raw.replace(/[$,]/g, "");
+  await db
+    .update(accounts)
+    .set({ balanceCurrent })
+    .where(eq(accounts.id, id));
+  revalidateAll();
+}
+
+export async function hideAccount(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  const hidden = String(formData.get("hidden") || "true") === "true";
+  if (!id) throw new Error("Account required");
+  await db.update(accounts).set({ hidden }).where(eq(accounts.id, id));
+  revalidateAll();
+}
+
+export async function deleteAccount(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  if (!id) throw new Error("Account required");
+  await db.delete(transactions).where(eq(transactions.accountId, id));
+  await db.delete(accounts).where(eq(accounts.id, id));
+  revalidateAll();
+}
+
+export async function scanPaychecksFromBank() {
+  const { matchPaychecksFromDeposits } = await import("@/lib/paycheck-match");
+  const result = await matchPaychecksFromDeposits();
+  revalidateAll();
+  return result;
+}
+
+export async function saveEmailReminderSettings(formData: FormData) {
+  const emailRaw = String(formData.get("email") || "").trim();
+  const enabled =
+    formData.get("enabled") === "on" || formData.get("enabled") === "1";
+
+  const { normalizeEmail } = await import("@/lib/email");
+  const {
+    setSetting,
+    SETTING_REMINDER_EMAIL,
+    SETTING_EMAIL_ENABLED,
+  } = await import("@/lib/checkin-email");
+
+  if (emailRaw) {
+    const email = normalizeEmail(emailRaw);
+    if (!email) {
+      return { ok: false as const, error: "Enter a valid email address." };
+    }
+    await setSetting(SETTING_REMINDER_EMAIL, email);
+  } else {
+    await setSetting(SETTING_REMINDER_EMAIL, "");
+  }
+  await setSetting(SETTING_EMAIL_ENABLED, enabled ? "1" : "0");
+  revalidatePath("/settings");
+  return { ok: true as const };
+}
+
+export async function sendTestEmailReminder() {
+  const { sendTestCheckinEmail } = await import("@/lib/checkin-email");
+  return sendTestCheckinEmail();
 }

@@ -20,6 +20,8 @@ export const incomeSources = pgTable("income_sources", {
   amountVaries: boolean("amount_varies").notNull().default(true),
   /** Palette key from JOB_COLOR_OPTIONS (forest, blue, …). */
   colorKey: text("color_key"),
+  /** Comma-separated keywords to match bank deposit descriptions (e.g. CIRACET,TIBER). */
+  depositMatch: text("deposit_match"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -63,6 +65,7 @@ export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   monthlyLimitCents: integer("monthly_limit_cents").notNull().default(0),
+  colorKey: text("color_key"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -102,8 +105,10 @@ export const plaidItems = pgTable("plaid_items", {
 export const accounts = pgTable("accounts", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  displayName: text("display_name"),
   officialName: text("official_name"),
   type: text("type").notNull().default("credit"), // credit | depository | other
+  subtype: text("subtype"), // checking | savings | credit card | …
   mask: text("mask"),
   balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
   balanceLimit: numeric("balance_limit", { precision: 12, scale: 2 }),
@@ -112,6 +117,8 @@ export const accounts = pgTable("accounts", {
     onDelete: "cascade",
   }),
   source: text("source").notNull().default("manual"), // plaid | csv | manual
+  hidden: boolean("hidden").notNull().default(false),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -134,6 +141,22 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Key/value app prefs (reminder email, toggles). */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Dedupes outbound check-in reminders (one row per sent day+kind). */
+export const reminderLog = pgTable("reminder_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sentOn: text("sent_on").notNull(), // YYYY-MM-DD in reminder TZ
+  kind: text("kind").notNull(), // payday | half-checkin | test
+  jobId: text("job_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type IncomeSource = typeof incomeSources.$inferSelect;
 export type PaycheckLog = typeof paycheckLogs.$inferSelect;
 export type Bill = typeof bills.$inferSelect;
@@ -143,3 +166,5 @@ export type SavingsGoal = typeof savingsGoals.$inferSelect;
 export type SavingsTransfer = typeof savingsTransfers.$inferSelect;
 export type Account = typeof accounts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
+export type AppSetting = typeof appSettings.$inferSelect;
+export type ReminderLog = typeof reminderLog.$inferSelect;

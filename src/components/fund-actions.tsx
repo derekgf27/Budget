@@ -49,13 +49,13 @@ export function FundActions({
 
   return (
     <>
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-1 flex flex-wrap gap-2">
         <button
           type="button"
           className={buttonPrimaryClass}
           onClick={() => setMode("deposit")}
         >
-          Add
+          Add money
         </button>
         <button
           type="button"
@@ -81,14 +81,14 @@ export function FundActions({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-bg-elevated p-6 shadow-xl"
+            className="relative z-10 w-full max-w-md notebook-sheet notebook-margin p-6"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 id={titleId} className="display text-2xl text-brand">
                   {mode === "deposit" ? "Add money" : "Withdraw"}
                 </h2>
-                <p className="mt-1 text-sm text-ink-muted">
+                <p className="mt-1 text-sm text-ink">
                   {name} · balance <Money cents={balanceCents} />
                 </p>
               </div>
@@ -96,7 +96,7 @@ export function FundActions({
                 ref={closeRef}
                 type="button"
                 onClick={() => setMode(null)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-sm border border-line px-2.5 py-1 text-sm hover:bg-bg-elevated"
               >
                 Close
               </button>

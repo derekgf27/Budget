@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { accounts, plaidItems, transactions } from "@/db/schema";
 import { getPlaidClient } from "@/lib/plaid";
+import { shouldAutoExcludeTransaction } from "@/lib/transaction-classify";
 
 function toCents(amount: number): number {
   // Plaid: positive amounts are money leaving the account (expenses)
@@ -55,11 +56,17 @@ export async function syncPlaidItem(plaidItemRowId: string) {
         amountCents: toCents(tx.amount),
         pending: tx.pending,
         source: "plaid" as const,
+        excluded: Boolean(
+          shouldAutoExcludeTransaction(tx.name, tx.merchant_name),
+        ),
       };
       if (existing[0]) {
         await db
           .update(transactions)
-          .set(values)
+          .set({
+            ...values,
+            excluded: existing[0].excluded || values.excluded,
+          })
           .where(eq(transactions.id, existing[0].id));
         modified += 1;
       } else {
@@ -74,6 +81,9 @@ export async function syncPlaidItem(plaidItemRowId: string) {
         .select()
         .from(transactions)
         .where(eq(transactions.plaidTransactionId, tx.transaction_id));
+      const autoExclude = Boolean(
+        shouldAutoExcludeTransaction(tx.name, tx.merchant_name),
+      );
       const values = {
         accountId,
         plaidTransactionId: tx.transaction_id,
@@ -83,6 +93,7 @@ export async function syncPlaidItem(plaidItemRowId: string) {
         amountCents: toCents(tx.amount),
         pending: tx.pending,
         source: "plaid" as const,
+        excluded: (existing[0]?.excluded ?? false) || autoExclude,
       };
       if (existing[0]) {
         await db
@@ -112,6 +123,8 @@ export async function syncPlaidItem(plaidItemRowId: string) {
     .set({ cursor: cursor ?? null })
     .where(eq(plaidItems.id, item.id));
 
+  const syncedAt = new Date();
+
   // refresh balances
   const accountsRes = await client.accountsGet({
     access_token: item.accessToken,
@@ -122,6 +135,8 @@ export async function syncPlaidItem(plaidItemRowId: string) {
       .set({
         balanceCurrent: acct.balances.current?.toString() ?? null,
         balanceLimit: acct.balances.limit?.toString() ?? null,
+        subtype: acct.subtype ?? null,
+        lastSyncedAt: syncedAt,
       })
       .where(eq(accounts.plaidAccountId, acct.account_id));
   }

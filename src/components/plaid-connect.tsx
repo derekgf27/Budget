@@ -92,7 +92,11 @@ export function SyncPlaidButton() {
       setMessage(data.error || "Sync failed");
       return;
     }
-    setMessage("Synced latest transactions");
+    setMessage(
+      data.paychecks?.logged || data.paychecks?.updated
+        ? `Synced · ${data.paychecks.logged || 0} paycheck(s) logged`
+        : "Synced latest transactions",
+    );
     router.refresh();
   }
 
@@ -102,7 +106,7 @@ export function SyncPlaidButton() {
         type="button"
         onClick={sync}
         disabled={busy}
-        className="rounded-md border border-line px-4 py-2 text-sm hover:bg-white disabled:opacity-50"
+        className="rounded-md border border-line px-4 py-2 text-sm hover:bg-bg-elevated disabled:opacity-50"
       >
         {busy ? "Syncing…" : "Sync transactions"}
       </button>

@@ -172,7 +172,7 @@ export type BillPaymentInput = {
   dueDate: string;
 };
 
-export type BillMonthStatus = "paid" | "upcoming" | "overdue";
+export type BillMonthStatus = "paid" | "upcoming" | "unpaid";
 
 export type BillThisMonth = {
   billId: string;
@@ -218,7 +218,7 @@ export function billsForMonth(
       if (paid.has(`${bill.id}:${date}`)) {
         status = "paid";
       } else if (date < todayIso) {
-        status = "overdue";
+        status = "unpaid";
       } else {
         status = "upcoming";
       }
@@ -234,7 +234,7 @@ export function billsForMonth(
   }
 
   const order: Record<BillMonthStatus, number> = {
-    overdue: 0,
+    unpaid: 0,
     upcoming: 1,
     paid: 2,
   };
@@ -262,6 +262,12 @@ export type MoneySplit = {
   periodStart: string;
   periodEnd: string;
   daysLeft: number;
+  /** early = 1–15, late = 16–end */
+  half: "early" | "late";
+  halfLabel: string;
+  halfStart: string;
+  halfEnd: string;
+  monthLabel: string;
   incomeCents: number;
   billsCents: number;
   savingsCents: number;
@@ -296,10 +302,49 @@ function daysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
 }
 
+/** First half (1–15) or second half (16–end) of the calendar month. */
+export function halfMonthBounds(today = new Date()): {
+  half: "early" | "late";
+  halfLabel: string;
+  start: string;
+  end: string;
+} {
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const day = today.getDate();
+  if (day <= 15) {
+    return {
+      half: "early",
+      halfLabel: "1st half",
+      start: formatDate(new Date(y, m, 1)),
+      end: formatDate(new Date(y, m, 15)),
+    };
+  }
+  return {
+    half: "late",
+    halfLabel: "2nd half",
+    start: formatDate(new Date(y, m, 16)),
+    end: formatDate(new Date(y, m + 1, 0)),
+  };
+}
+
+/** Schedule the next payday after a paycheck was received. */
+export function nextPaydayAfter(
+  paidOn: string,
+  cadence: Cadence,
+  scheduleAnchor: string,
+): string {
+  return advanceToOnOrAfter(
+    scheduleAnchor,
+    cadence,
+    addDays(parseDate(paidOn), 1),
+  );
+}
+
 /**
- * Current paycheck window:
- * start = most recent payday on/before today (across jobs)
- * end   = soonest payday after today (across jobs)
+ * Calendar-month money split.
+ * Income / spend / bills / safe-to-spend are for this month.
+ * Savings plan assumes two check-ins (1st & 2nd half).
  */
 export function computeMoneySplit(
   incomes: IncomeInput[],
@@ -314,13 +359,23 @@ export function computeMoneySplit(
     today.getMonth(),
     today.getDate(),
   );
+  const { start: monthStartDate, end: monthEndDate, label: monthLabel } =
+    monthBounds(today);
+  const periodStart = formatDate(monthStartDate);
+  const periodEnd = formatDate(monthEndDate);
+  const half = halfMonthBounds(today);
+  const daysLeft = daysBetween(todayStart, monthEndDate);
 
   if (incomes.length === 0) {
-    const empty = formatDate(todayStart);
     return {
-      periodStart: empty,
-      periodEnd: empty,
-      daysLeft: 0,
+      periodStart,
+      periodEnd,
+      daysLeft,
+      half: half.half,
+      halfLabel: half.halfLabel,
+      halfStart: half.start,
+      halfEnd: half.end,
+      monthLabel,
       incomeCents: 0,
       billsCents: 0,
       savingsCents: 0,
@@ -329,7 +384,7 @@ export function computeMoneySplit(
       incomeByJob: [],
       drivers: [
         {
-          label: "Add a job to start tracking this window",
+          label: "Add a job to start tracking this month",
           tone: "warn",
         },
       ],
@@ -338,67 +393,60 @@ export function computeMoneySplit(
     };
   }
 
-  const schedules = incomes.map((inc) => {
-    const lastIso = retreatToOnOrBefore(inc.nextPayday, inc.cadence, todayStart);
-    const nextIso = advanceToOnOrAfter(
-      inc.nextPayday,
-      inc.cadence,
-      addDays(todayStart, 1),
+  const incomeByJob = incomes.map((inc) => {
+    const monthLogs = paycheckLogs
+      .filter(
+        (l) =>
+          l.incomeSourceId === inc.id &&
+          l.paidOn >= periodStart &&
+          l.paidOn <= periodEnd,
+      )
+      .sort((a, b) => b.paidOn.localeCompare(a.paidOn));
+    const loggedAmount = monthLogs.reduce((sum, l) => sum + l.amountCents, 0);
+    const logged = monthLogs.length > 0;
+    const expectedPays = Math.max(
+      1,
+      occurrencesInRange(
+        inc.nextPayday,
+        inc.cadence,
+        monthStartDate,
+        monthEndDate,
+      ).length,
     );
-    return { income: inc, lastIso, nextIso };
-  });
-
-  const periodStart = schedules
-    .map((s) => s.lastIso)
-    .sort()
-    .at(-1)!;
-  const periodEnd = schedules.map((s) => s.nextIso).sort()[0]!;
-
-  const periodStartDate = parseDate(periodStart);
-  const periodEndDate = parseDate(periodEnd);
-  const daysLeft = daysBetween(todayStart, periodEndDate);
-
-  function logFor(incomeId: string, date: string) {
-    return paycheckLogs.find(
-      (l) => l.incomeSourceId === incomeId && l.paidOn === date,
-    );
-  }
-
-  function amountFor(incomeId: string, date: string, fallback: number) {
-    const log = logFor(incomeId, date);
-    return log ? log.amountCents : fallback;
-  }
-
-  const incomeByJob = schedules.map((s) => {
-    const log = logFor(s.income.id, s.lastIso);
-    const fundsWindow = s.lastIso === periodStart;
+    const estimate = inc.netAmountCents * expectedPays;
+    const latest = monthLogs[0]?.paidOn ?? periodStart;
     return {
-      id: s.income.id,
-      name: s.income.name,
-      payday: s.lastIso,
-      amountCents: log ? log.amountCents : s.income.netAmountCents,
-      logged: Boolean(log),
-      fundsWindow,
+      id: inc.id,
+      name: inc.name,
+      payday: latest,
+      amountCents: logged ? loggedAmount : estimate,
+      logged,
+      fundsWindow: true,
     };
   });
 
-  // Income that funded this window: paycheck(s) on periodStart
-  const incomeCents = incomeByJob
-    .filter((j) => j.fundsWindow)
-    .reduce((sum, j) => sum + j.amountCents, 0);
+  const anyLogged = incomeByJob.some((j) => j.logged);
+  const incomeCents = anyLogged
+    ? incomeByJob
+        .filter((j) => j.logged)
+        .reduce((sum, j) => sum + j.amountCents, 0)
+    : incomeByJob.reduce((sum, j) => sum + j.amountCents, 0);
 
-  const upcomingPaydays = schedules
-    .filter((s) => s.nextIso === periodEnd)
-    .map((s) => ({
-      id: s.income.id,
-      name: s.income.name,
-      date: s.nextIso,
-      amountCents: amountFor(
-        s.income.id,
-        s.nextIso,
-        s.income.netAmountCents,
-      ),
-    }))
+  const upcomingPaydays = incomes
+    .map((inc) => {
+      const nextIso = advanceToOnOrAfter(
+        inc.nextPayday,
+        inc.cadence,
+        addDays(todayStart, 1),
+      );
+      return {
+        id: inc.id,
+        name: inc.name,
+        date: nextIso,
+        amountCents: inc.netAmountCents,
+      };
+    })
+    .filter((p) => p.date <= periodEnd)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const billsDue: MoneySplit["billsDue"] = [];
@@ -407,8 +455,8 @@ export function computeMoneySplit(
     const dues = occurrencesInRange(
       bill.nextDueDate,
       bill.cadence,
-      periodStartDate,
-      periodEndDate,
+      monthStartDate,
+      monthEndDate,
     );
     for (const date of dues) {
       billsCents += bill.amountCents;
@@ -423,8 +471,9 @@ export function computeMoneySplit(
   }
   billsDue.sort((a, b) => a.date.localeCompare(b.date));
 
+  // Two check-ins per month (1st half + 2nd half)
   const savingsCents = savings.reduce(
-    (sum, g) => sum + g.contributionPerPeriodCents,
+    (sum, g) => sum + g.contributionPerPeriodCents * 2,
     0,
   );
 
@@ -437,25 +486,30 @@ export function computeMoneySplit(
   const safeToSpendCents = incomeCents - billsCents - savingsCents - spentCents;
 
   const drivers: MoneySplit["drivers"] = [];
-  const unloggedFunding = incomeByJob.filter((j) => j.fundsWindow && !j.logged);
-  if (unloggedFunding.length > 0) {
-    for (const job of unloggedFunding) {
+  const unlogged = incomeByJob.filter((j) => !j.logged);
+  if (unlogged.length > 0 && anyLogged) {
+    for (const job of unlogged) {
       drivers.push({
-        label: `No paycheck logged for ${job.name} on ${formatDisplayDate(job.payday)}`,
+        label: `${job.name} not logged yet this month`,
         tone: "warn",
       });
     }
+  } else if (!anyLogged && incomes.length > 0) {
+    drivers.push({
+      label: "Using pay estimates until deposits are logged",
+      tone: "warn",
+    });
   }
   if (billsCents > 0) {
     drivers.push({
-      label: "Bills due in this window",
+      label: "Bills this month",
       amountCents: -billsCents,
       tone: "neutral",
     });
   }
   if (savingsCents > 0) {
     drivers.push({
-      label: "Savings plan",
+      label: "Savings (both check-ins)",
       amountCents: -savingsCents,
       tone: "neutral",
     });
@@ -484,6 +538,11 @@ export function computeMoneySplit(
     periodStart,
     periodEnd,
     daysLeft,
+    half: half.half,
+    halfLabel: half.halfLabel,
+    halfStart: half.start,
+    halfEnd: half.end,
+    monthLabel,
     incomeCents,
     billsCents,
     savingsCents,

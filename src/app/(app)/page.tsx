@@ -1,14 +1,21 @@
 import { desc } from "drizzle-orm";
-import { BillsThisMonth } from "@/components/bills-this-month";
+import Link from "next/link";
+import { HomeAlerts } from "@/components/habit-alerts";
 import { LogPaycheckButton } from "@/components/log-paycheck-button";
 import { MoneySplitChart } from "@/components/money-split-chart";
-import { PaydayChecklist } from "@/components/payday-checklist";
+import { MonthChecklist } from "@/components/month-checklist";
+import {
+  MonthPicker,
+  dateFromMonthKey,
+  resolveMonthKey,
+} from "@/components/month-picker";
 import { Money, PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
 import {
   accounts,
   billPayments,
   bills,
+  categories,
   incomeSources,
   paycheckLogs,
   savingsGoals,
@@ -16,29 +23,32 @@ import {
   transactions,
 } from "@/db/schema";
 import {
-  billsForMonth,
-  computeMoneySplit,
-  monthBounds,
-  type Cadence,
-} from "@/lib/money";
+  getCategoryGuardrails,
+  getPaydayReminders,
+  getSafeSpendGuardrail,
+} from "@/lib/habits";
+import { computeMoneySplit, type Cadence } from "@/lib/money";
+import { accountLabel, visibleAccounts } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ month?: string }>;
+}) {
   if (!hasDatabase()) {
     return (
       <div>
         <PageHeader
-          title="Dashboard"
+          title="Home"
           description="Connect Neon to store your budget data."
         />
         <Panel>
           <p className="text-ink-muted">
             Copy <code className="text-brand">.env.example</code> to{" "}
             <code className="text-brand">.env.local</code>, set{" "}
-            <code className="text-brand">DATABASE_URL</code>,{" "}
-            <code className="text-brand">APP_PIN</code>, and{" "}
-            <code className="text-brand">SESSION_SECRET</code>, then run{" "}
+            <code className="text-brand">DATABASE_URL</code>, then run{" "}
             <code className="text-brand">npm run db:push</code> and{" "}
             <code className="text-brand">npm run db:seed</code>.
           </p>
@@ -47,16 +57,27 @@ export default async function DashboardPage() {
     );
   }
 
+  const params = (await searchParams) || {};
+  const monthKeyParam = resolveMonthKey(params.month);
+  const viewDate = dateFromMonthKey(monthKeyParam);
   const db = getDb();
-  const [incomes, billRows, goals, txs, accountRows, logs, payments] =
+
+  const { tidyTransactionsForSpend } = await import("@/lib/spend-tidy");
+  await tidyTransactionsForSpend();
+
+  const [incomes, billRows, goals, txs, accountRows, logs, payments, cats] =
     await Promise.all([
       db.select().from(incomeSources),
       db.select().from(bills),
       db.select().from(savingsGoals),
-      db.select().from(transactions).orderBy(desc(transactions.date)).limit(200),
+      db
+        .select()
+        .from(transactions)
+        .orderBy(desc(transactions.date)),
       db.select().from(accounts),
       db.select().from(paycheckLogs),
       db.select().from(billPayments),
+      db.select().from(categories),
     ]);
 
   let transfers: (typeof savingsTransfers.$inferSelect)[] = [];
@@ -77,23 +98,15 @@ export default async function DashboardPage() {
     })),
     goals,
     txs,
-    new Date(),
+    viewDate,
     logs,
-  );
-
-  const { label: monthLabel } = monthBounds();
-  const monthlyBills = billsForMonth(
-    billRows.map((b) => ({
-      ...b,
-      cadence: b.cadence as Cadence,
-    })),
-    payments,
   );
 
   const paid = new Set(payments.map((p) => `${p.billId}:${p.dueDate}`));
   const incomeNameById = new Map(incomes.map((i) => [i.id, i.name]));
   const incomeColorById = new Map(incomes.map((i) => [i.id, i.colorKey]));
-  const unpaidInWindow = split.billsDue
+
+  const unpaidThisMonth = split.billsDue
     .filter((b) => !paid.has(`${b.billId}:${b.date}`))
     .map((b) => ({
       ...b,
@@ -105,29 +118,32 @@ export default async function DashboardPage() {
         : null,
     }));
 
-  const fundingJobs = split.incomeByJob
-    .filter((j) => j.fundsWindow)
-    .map((j) => ({
-      ...j,
-      colorKey: incomeColorById.get(j.id) ?? null,
-    }));
   const savingsItems = goals.map((g) => {
     const plannedCents = g.contributionPerPeriodCents;
-    const movedThisWindow = transfers.some(
+    const movedThisHalf = transfers.some(
       (t) =>
         t.savingsId === g.id &&
         t.amountCents > 0 &&
-        t.transferredOn >= split.periodStart &&
-        t.transferredOn <= split.periodEnd,
+        t.transferredOn >= split.halfStart &&
+        t.transferredOn <= split.halfEnd,
     );
     return {
       id: g.id,
       name: g.name,
       kind: (g.kind === "fund" ? "fund" : "goal") as "goal" | "fund",
       plannedCents,
-      movedThisWindow,
+      movedThisHalf,
     };
   });
+
+  const uncategorizedCount = txs.filter(
+    (t) =>
+      !t.excluded &&
+      !t.categoryId &&
+      t.amountCents > 0 &&
+      t.date >= split.periodStart &&
+      t.date <= split.periodEnd,
+  ).length;
 
   const jobOptions = incomes.map((i) => ({
     id: i.id,
@@ -136,97 +152,153 @@ export default async function DashboardPage() {
     colorKey: i.colorKey,
   }));
 
+  const monthKey = monthKeyParam;
+  const loggedJobIdsThisMonth = new Set(
+    logs
+      .filter((l) => l.paidOn.startsWith(monthKey))
+      .map((l) => l.incomeSourceId),
+  );
+  const paydayReminders = getPaydayReminders(
+    incomes.map((i) => ({
+      id: i.id,
+      name: i.name,
+      nextPayday: i.nextPayday,
+      cadence: i.cadence as Cadence,
+    })),
+    loggedJobIdsThisMonth,
+    viewDate,
+  );
+
+  const spentByCategoryId = new Map<string, number>();
+  for (const t of txs) {
+    if (
+      t.excluded ||
+      !t.categoryId ||
+      t.amountCents <= 0 ||
+      t.date < split.periodStart ||
+      t.date > split.periodEnd
+    ) {
+      continue;
+    }
+    spentByCategoryId.set(
+      t.categoryId,
+      (spentByCategoryId.get(t.categoryId) ?? 0) + t.amountCents,
+    );
+  }
+  const categoryGuardrails = getCategoryGuardrails(cats, spentByCategoryId);
+  const safeGuardrail = getSafeSpendGuardrail(
+    split.safeToSpendCents,
+    split.daysLeft,
+  );
+
+  const accountRowsVisible = visibleAccounts(accountRows);
+
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        description="How this paycheck window is splitting across bills, savings, and spending."
+        title={split.monthLabel}
+        description={`${split.halfLabel} check-in · categorize, bills, savings.`}
         action={
-          <LogPaycheckButton
-            jobs={jobOptions}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <MonthPicker monthKey={monthKey} basePath="/" />
+            <LogPaycheckButton jobs={jobOptions} />
+          </div>
         }
       />
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(16rem,20rem)_1fr] lg:items-start">
-        <PaydayChecklist
-          jobs={jobOptions}
-          fundingJobs={fundingJobs}
-          unpaidBills={unpaidInWindow}
-          savingsItems={savingsItems}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Panel className="!p-4">
-            <p className="text-sm font-medium text-safe">Safe to spend</p>
+      {/* Two notebook pages side by side on wide screens */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
+          <section className="notebook-sheet notebook-margin px-5 py-6 sm:px-7">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-muted">
+              Safe to spend
+            </p>
             <p
-              className={`mt-2 display text-3xl ${
+              className={`display mt-2 text-5xl tracking-tight sm:text-6xl ${
                 split.safeToSpendCents < 0 ? "text-danger" : "text-safe"
               }`}
             >
               <Money cents={split.safeToSpendCents} />
             </p>
-            <p className="mt-2 text-sm text-ink">
+            <p className="mt-3 text-sm text-ink-muted">
               {split.daysLeft === 0
-                ? "Last day of this window"
+                ? "Last day of the month"
                 : split.daysLeft === 1
-                  ? "1 day left in this window"
-                  : `${split.daysLeft} days left in this window`}
+                  ? "1 day left this month"
+                  : `${split.daysLeft} days left this month`}
             </p>
             {split.incomeCents === 0 ? (
               <p className="mt-2 text-sm text-ink">
-                Log this paycheck to unlock a real number.
+                Log paychecks this month to unlock a real number.
               </p>
             ) : split.safeToSpendCents < 0 ? (
               <p className="mt-2 text-sm text-danger">
                 Plans exceed income — trim bills/savings or log more pay.
               </p>
             ) : null}
-          </Panel>
-          <Panel className="!p-4">
-            <h2 className="display text-lg text-brand">Credit balances</h2>
-            <ul className="mt-3 space-y-2.5">
-              {accountRows.length === 0 ? (
-                <li className="text-sm text-ink">
-                  Connect a card on Accounts
-                </li>
-              ) : (
-                accountRows.map((a) => (
+          </section>
+
+          <MonthChecklist
+            halfLabel={split.halfLabel}
+            uncategorizedCount={uncategorizedCount}
+            unpaidBills={unpaidThisMonth}
+            savingsItems={savingsItems}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          <MoneySplitChart
+            split={split}
+            jobs={jobOptions}
+            monthLabel={split.monthLabel}
+          />
+
+          <section className="notebook-sheet px-5 py-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-muted">
+                Balances
+              </p>
+              <Link
+                href="/accounts"
+                className="text-xs text-ink-muted underline-offset-2 hover:underline"
+              >
+                Accounts
+              </Link>
+            </div>
+            {accountRowsVisible.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-muted">
+                Connect an account on Accounts.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {accountRowsVisible.map((a) => (
                   <li
                     key={a.id}
                     className="flex items-center justify-between gap-2 text-sm"
                   >
-                    <span className="min-w-0 truncate">
-                      {a.name}
-                      {a.mask ? (
-                        <span className="text-ink-muted"> ···{a.mask}</span>
-                      ) : null}
+                    <span className="min-w-0 truncate text-ink-muted">
+                      {accountLabel(a)}
+                      {a.mask ? <span> ···{a.mask}</span> : null}
                     </span>
-                    <span className="shrink-0 font-medium">
-                      {a.balanceCurrent
+                    <span className="shrink-0 font-medium tabular-nums">
+                      {a.balanceCurrent != null && a.balanceCurrent !== ""
                         ? `$${Number(a.balanceCurrent).toFixed(2)}`
                         : "—"}
                     </span>
                   </li>
-                ))
-              )}
-            </ul>
-          </Panel>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       </div>
 
-      <MoneySplitChart
-        split={split}
+      <HomeAlerts
+        reminders={paydayReminders}
         jobs={jobOptions}
-      />
-
-      <BillsThisMonth
-        monthLabel={monthLabel}
-        bills={monthlyBills}
-        incomes={incomes.map((i) => ({
-          id: i.id,
-          name: i.name,
-          colorKey: i.colorKey,
-        }))}
+        safe={safeGuardrail}
+        categories={categoryGuardrails}
+        monthKey={monthKey}
       />
     </div>
   );

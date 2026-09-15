@@ -70,7 +70,7 @@ export function LogPaycheckButton({
     (variant === "ghost"
       ? buttonGhostClass
       : variant === "nav"
-        ? "flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-brand"
+        ? "flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-white"
         : buttonPrimaryClass);
 
   return (
@@ -85,7 +85,7 @@ export function LogPaycheckButton({
       >
         {variant === "nav" ? (
           <>
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-white/20 text-sm text-white">
               +
             </span>
             <span>{label}</span>
@@ -125,7 +125,7 @@ export function LogPaycheckButton({
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-bg-elevated"
               >
                 Close
               </button>

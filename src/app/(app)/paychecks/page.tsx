@@ -1,26 +1,17 @@
 import { desc } from "drizzle-orm";
 import { deleteIncome, deletePaycheckLog } from "@/app/actions";
 import { AddJobButton } from "@/components/add-job-button";
+import { ConfirmDeleteForm } from "@/components/confirm-delete";
 import { EditJobButton } from "@/components/edit-job-button";
 import { JobDot } from "@/components/job-tag";
 import { LogPaycheckButton } from "@/components/log-paycheck-button";
+import { ScanPaychecksButton } from "@/components/scan-paychecks-button";
 import { Money, PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
 import { incomeSources, paycheckLogs } from "@/db/schema";
-import { formatDisplayDate, parseDate } from "@/lib/money";
+import { formatDisplayDate } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
-
-function paydayCue(iso: string, today = new Date()): string | null {
-  const payday = parseDate(iso);
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const days = Math.round(
-    (payday.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  return null;
-}
 
 export default async function PaychecksPage() {
   if (!hasDatabase()) {
@@ -43,8 +34,13 @@ export default async function PaychecksPage() {
     <div>
       <PageHeader
         title="Paychecks"
-        description="Your jobs and next paydays."
-        action={<AddJobButton />}
+        description="Jobs auto-log from bank deposits when Sync finds a match."
+        action={
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            <ScanPaychecksButton />
+            <AddJobButton />
+          </div>
+        }
       />
 
       {incomes.length === 0 ? (
@@ -61,7 +57,6 @@ export default async function PaychecksPage() {
           {incomes.map((inc) => {
             const jobLogs = logs.filter((l) => l.incomeSourceId === inc.id);
             const latest = jobLogs[0];
-            const cue = paydayCue(inc.nextPayday);
 
             return (
               <li key={inc.id}>
@@ -72,24 +67,33 @@ export default async function PaychecksPage() {
                         <JobDot id={inc.id} colorKey={inc.colorKey} />
                         {inc.name}
                       </p>
-                      <p className="mt-1.5">
-                        <span className="text-xs text-ink-muted">Next</span>
-                        <span className="mt-0.5 flex flex-wrap items-baseline gap-2">
-                          <span className="text-base font-medium text-ink">
-                            {formatDisplayDate(inc.nextPayday)}
-                          </span>
-                          {cue ? (
-                            <span className="text-xs font-medium text-brand-soft">
-                              {cue}
-                            </span>
-                          ) : null}
-                        </span>
-                      </p>
-                      {latest ? (
-                        <p className="mt-1 text-sm text-ink">
-                          Last · <Money cents={latest.amountCents} className="font-medium" />
+                      {inc.depositMatch ? (
+                        <p className="mt-0.5 text-xs text-ink-muted">
+                          Bank match: {inc.depositMatch}
                         </p>
-                      ) : null}
+                      ) : (
+                        <p className="mt-0.5 text-xs text-amber-800/80">
+                          Set a bank match keyword in Edit
+                        </p>
+                      )}
+                      {latest ? (
+                        <p className="mt-1.5 text-base">
+                          <span className="text-xs text-ink-muted">Last paid</span>
+                          <span className="mt-0.5 block font-medium">
+                            <Money cents={latest.amountCents} />
+                            <span className="ml-2 text-sm font-normal text-ink-muted">
+                              {formatDisplayDate(latest.paidOn)}
+                            </span>
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="mt-1.5 text-sm text-ink-muted">
+                          No paycheck logged yet
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Approx. next · {formatDisplayDate(inc.nextPayday)}
+                      </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -121,17 +125,17 @@ export default async function PaychecksPage() {
                           nextPayday: inc.nextPayday,
                           amountVaries: inc.amountVaries,
                           colorKey: inc.colorKey,
+                          depositMatch: inc.depositMatch,
                         }}
                       />
-                      <form action={deleteIncome}>
+                      <ConfirmDeleteForm
+                        action={deleteIncome}
+                        itemName={inc.name}
+                        buttonClassName="px-1 text-sm text-danger/80 hover:text-danger"
+                        confirmLabel="This removes the job and its paycheck history."
+                      >
                         <input type="hidden" name="id" value={inc.id} />
-                        <button
-                          type="submit"
-                          className="px-1 text-sm text-danger/80 hover:text-danger"
-                        >
-                          Delete
-                        </button>
-                      </form>
+                      </ConfirmDeleteForm>
                     </div>
                   </div>
 
@@ -140,7 +144,7 @@ export default async function PaychecksPage() {
                       <summary className="cursor-pointer text-sm text-brand-soft hover:underline">
                         History ({jobLogs.length})
                       </summary>
-                      <ul className="mt-2 space-y-2 rounded-lg border border-line bg-white/70 p-3">
+                      <ul className="mt-2 space-y-2 rounded-lg border border-line bg-paper/80 p-3">
                         {jobLogs.slice(0, 8).map((log) => (
                           <li
                             key={log.id}
@@ -160,15 +164,15 @@ export default async function PaychecksPage() {
                                 cents={log.amountCents}
                                 className="font-medium"
                               />
-                              <form action={deletePaycheckLog}>
+                              <ConfirmDeleteForm
+                                action={deletePaycheckLog}
+                                itemName={`paycheck on ${formatDisplayDate(log.paidOn)}`}
+                                buttonLabel="Remove"
+                                buttonClassName="text-xs text-danger/70 hover:text-danger"
+                                confirmLabel="This removes that paycheck log only."
+                              >
                                 <input type="hidden" name="id" value={log.id} />
-                                <button
-                                  type="submit"
-                                  className="text-xs text-danger/70 hover:text-danger"
-                                >
-                                  Remove
-                                </button>
-                              </form>
+                              </ConfirmDeleteForm>
                             </span>
                           </li>
                         ))}

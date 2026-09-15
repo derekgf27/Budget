@@ -1,6 +1,7 @@
 import { deleteBill, markBillPaid } from "@/app/actions";
 import { AddBillButton } from "@/components/add-bill-button";
 import { BillForm } from "@/components/bill-form";
+import { ConfirmDeleteForm } from "@/components/confirm-delete";
 import { JobTag } from "@/components/job-tag";
 import {
   Money,
@@ -70,11 +71,33 @@ export default async function BillsPage() {
             const income = incomes.find((i) => i.id === bill.incomeSourceId);
             const nextPaid = paid.has(`${bill.id}:${bill.nextDueDate}`);
             return (
-              <li key={bill.id} className="px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{bill.name}</p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-muted">
+              <li
+                key={bill.id}
+                className={`px-4 py-3 ${
+                  nextPaid ? "bg-rule/30" : ""
+                }`}
+              >
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,1fr)_7.25rem_11.5rem] sm:items-center sm:gap-x-5">
+                  <div className={`min-w-0 ${nextPaid ? "opacity-70" : ""}`}>
+                    <div className="flex items-baseline justify-between gap-3 sm:block">
+                      <p
+                        className={`truncate font-medium leading-snug ${
+                          nextPaid ? "text-ink-muted" : ""
+                        }`}
+                      >
+                        {bill.name}
+                      </p>
+                      <span className="sm:hidden">
+                        <span
+                          className={`block text-right tabular-nums font-semibold ${
+                            nextPaid ? "text-ink-muted" : ""
+                          }`}
+                        >
+                          <Money cents={bill.amountCents} />
+                        </span>
+                      </span>
+                    </div>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-muted sm:text-sm">
                       <span>
                         {cadenceLabel(bill.cadence)} · due{" "}
                         {formatDisplayDate(bill.nextDueDate)}
@@ -87,12 +110,22 @@ export default async function BillsPage() {
                         />
                       ) : null}
                       {nextPaid ? (
-                        <span className="text-safe">Next due paid</span>
+                        <span className="font-medium text-safe">Paid</span>
                       ) : null}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Money cents={bill.amountCents} className="font-medium" />
+
+                  <div
+                    className={`hidden w-full justify-end sm:flex ${
+                      nextPaid ? "opacity-70" : ""
+                    }`}
+                  >
+                    <span className="block w-full text-right tabular-nums font-semibold">
+                      <Money cents={bill.amountCents} />
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 flex flex-wrap items-center justify-end gap-2 sm:col-span-1">
                     {!nextPaid ? (
                       <form action={markBillPaid}>
                         <input type="hidden" name="billId" value={bill.id} />
@@ -107,19 +140,21 @@ export default async function BillsPage() {
                         </button>
                       </form>
                     ) : null}
-                    <form action={deleteBill}>
+                    <ConfirmDeleteForm
+                      action={deleteBill}
+                      itemName={bill.name}
+                      buttonClassName={buttonDangerClass}
+                      confirmLabel="This removes the bill and its payment history."
+                    >
                       <input type="hidden" name="id" value={bill.id} />
-                      <button type="submit" className={buttonDangerClass}>
-                        Delete
-                      </button>
-                    </form>
+                    </ConfirmDeleteForm>
                   </div>
                 </div>
                 <details className="mt-2 group">
                   <summary className="cursor-pointer text-sm text-brand-soft hover:underline">
                     Edit
                   </summary>
-                  <div className="mt-2 rounded-lg border border-line bg-white/70 p-3">
+                  <div className="mt-2 rounded-lg border border-line bg-paper/80 p-3">
                     <BillForm
                       incomes={incomeOptions}
                       submitLabel="Update bill"

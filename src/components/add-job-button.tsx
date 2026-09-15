@@ -65,7 +65,7 @@ export function AddJobButton() {
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-bg-elevated"
               >
                 Close
               </button>

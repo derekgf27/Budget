@@ -1,32 +1,47 @@
 import Link from "next/link";
-import { deleteCategory } from "@/app/actions";
+import { asc } from "drizzle-orm";
 import { AddCategoryButton } from "@/components/add-category-button";
-import { EditCategoryButton } from "@/components/edit-category-button";
+import { BudgetCategoryCard } from "@/components/budget-category-card";
+import {
+  MonthPicker,
+  formatMonthKeyLabel,
+  resolveMonthKey,
+} from "@/components/month-picker";
 import { Money, PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
-import { categories, transactions } from "@/db/schema";
+import { accounts, categories, transactions } from "@/db/schema";
+import { accountLabel } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
-export default async function BudgetPage() {
+export default async function BudgetPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ month?: string }>;
+}) {
   if (!hasDatabase()) {
     return (
       <PageHeader title="Budget" description="Add DATABASE_URL to continue." />
     );
   }
 
+  const params = (await searchParams) || {};
+  const monthPrefix = resolveMonthKey(params.month);
+  const monthLabel = formatMonthKeyLabel(monthPrefix);
+
   const db = getDb();
-  const [cats, txs] = await Promise.all([
-    db.select().from(categories),
+  const [cats, txs, accountRows] = await Promise.all([
+    db
+      .select()
+      .from(categories)
+      .orderBy(asc(categories.createdAt), asc(categories.id)),
     db.select().from(transactions),
+    db.select().from(accounts),
   ]);
 
-  const now = new Date();
-  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthLabel = now.toLocaleString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const accountById = new Map(
+    accountRows.map((a) => [a.id, accountLabel(a)]),
+  );
 
   const monthTxs = txs.filter(
     (t) =>
@@ -38,15 +53,24 @@ export default async function BudgetPage() {
   const uncategorizedCount = monthTxs.filter((t) => !t.categoryId).length;
 
   const rows = cats.map((cat) => {
-    const spent = monthTxs
+    const expenses = monthTxs
       .filter((t) => t.categoryId === cat.id)
-      .reduce((sum, t) => sum + t.amountCents, 0);
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((t) => ({
+        id: t.id,
+        date: t.date,
+        name: t.name,
+        merchantName: t.merchantName,
+        amountCents: t.amountCents,
+        accountLabel: t.accountId ? accountById.get(t.accountId) ?? null : null,
+      }));
+    const spent = expenses.reduce((sum, t) => sum + t.amountCents, 0);
     const limit = cat.monthlyLimitCents;
     const remaining = limit - spent;
     const over = remaining < 0;
     const barPct =
       limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
-    return { cat, spent, limit, remaining, over, barPct };
+    return { cat, spent, limit, remaining, over, barPct, expenses };
   });
 
   const totalBudgeted = rows.reduce((sum, r) => sum + r.limit, 0);
@@ -63,7 +87,12 @@ export default async function BudgetPage() {
       <PageHeader
         title="Budget"
         description={`Monthly category limits versus spending · ${monthLabel}`}
-        action={<AddCategoryButton />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <MonthPicker monthKey={monthPrefix} basePath="/budget" />
+            <AddCategoryButton />
+          </div>
+        }
       />
 
       {cats.length === 0 ? (
@@ -109,18 +138,6 @@ export default async function BudgetPage() {
                 </p>
               </div>
             </div>
-            {totalBudgeted > 0 ? (
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-line">
-                <div
-                  className={`h-full rounded-full ${
-                    totalOver ? "bg-danger" : "bg-brand"
-                  }`}
-                  style={{
-                    width: `${Math.min(100, Math.round((totalSpent / totalBudgeted) * 100))}%`,
-                  }}
-                />
-              </div>
-            ) : null}
           </Panel>
 
           {uncategorizedCount > 0 ? (
@@ -142,59 +159,18 @@ export default async function BudgetPage() {
           ) : null}
 
           <ul className="grid gap-4 lg:grid-cols-2">
-            {rows.map(({ cat, spent, limit, remaining, over, barPct }) => (
+            {rows.map(({ cat, spent, limit, remaining, over, barPct, expenses }) => (
               <li key={cat.id}>
-                <Panel className="h-full">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-medium">{cat.name}</p>
-                      <p className="mt-0.5 text-sm text-ink-muted">
-                        <Money cents={spent} /> of <Money cents={limit} />
-                      </p>
-                      <p
-                        className={`mt-1 text-sm font-medium ${
-                          over ? "text-danger" : "text-safe"
-                        }`}
-                      >
-                        {over ? (
-                          <>
-                            <Money cents={Math.abs(remaining)} /> over
-                          </>
-                        ) : (
-                          <>
-                            <Money cents={remaining} /> left
-                          </>
-                        )}
-                      </p>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-line">
-                        <div
-                          className={`h-full rounded-full ${
-                            over ? "bg-danger" : "bg-brand"
-                          }`}
-                          style={{ width: `${barPct}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <EditCategoryButton
-                        initial={{
-                          id: cat.id,
-                          name: cat.name,
-                          limit: (cat.monthlyLimitCents / 100).toFixed(2),
-                        }}
-                      />
-                      <form action={deleteCategory}>
-                        <input type="hidden" name="id" value={cat.id} />
-                        <button
-                          type="submit"
-                          className="px-1 text-sm text-danger/80 hover:text-danger"
-                        >
-                          Delete
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                </Panel>
+                <BudgetCategoryCard
+                  category={cat}
+                  spent={spent}
+                  limit={limit}
+                  remaining={remaining}
+                  over={over}
+                  barPct={barPct}
+                  monthLabel={monthLabel}
+                  expenses={expenses}
+                />
               </li>
             ))}
           </ul>

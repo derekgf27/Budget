@@ -68,14 +68,14 @@ export function AddSavingsButton() {
                 <p className="mt-1 text-sm text-ink-muted">
                   {open === "fund"
                     ? "A flexible pot — deposit any amount whenever you want."
-                    : "Track a target and planned contribution each paycheck window."}
+                    : "Track a target and planned contribution each check-in (twice a month)."}
                 </p>
               </div>
               <button
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(null)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-bg-elevated"
               >
                 Close
               </button>

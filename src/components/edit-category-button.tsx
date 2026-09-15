@@ -8,6 +8,7 @@ type CategoryInitial = {
   id: string;
   name: string;
   limit: string;
+  colorKey?: string | null;
 };
 
 export function EditCategoryButton({
@@ -72,7 +73,7 @@ export function EditCategoryButton({
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-bg-elevated"
               >
                 Close
               </button>

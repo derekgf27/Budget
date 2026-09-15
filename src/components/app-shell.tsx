@@ -2,20 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogPaycheckButton } from "@/components/log-paycheck-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-const moneyLinks = [
-  { href: "/", label: "Dashboard" },
-  { href: "/bills", label: "Bills" },
+const primaryLinks = [
+  { href: "/", label: "Home" },
+  { href: "/coach", label: "Coach" },
   { href: "/transactions", label: "Transactions" },
-];
-
-const setupLinks = [
-  { href: "/paychecks", label: "Paychecks" },
+  { href: "/bills", label: "Bills" },
   { href: "/budget", label: "Budget" },
   { href: "/savings", label: "Savings" },
+];
+
+const moreLinks = [
+  { href: "/paychecks", label: "Paychecks" },
   { href: "/accounts", label: "Accounts" },
+  { href: "/settings", label: "Settings" },
 ];
 
 type JobOption = {
@@ -23,6 +26,10 @@ type JobOption = {
   name: string;
   nextPayday: string;
 };
+
+function isActive(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
 
 function NavLink({
   href,
@@ -39,19 +46,21 @@ function NavLink({
     <Link
       href={href}
       onClick={onClick}
-      className={`rounded-md px-3 py-2 text-sm transition ${
+      className={`relative px-1 py-1 text-sm transition ${
         active
-          ? "bg-white/15 text-white"
-          : "text-white/75 hover:bg-white/10 hover:text-white"
+          ? "font-semibold text-white"
+          : "text-white/75 hover:text-white"
       }`}
     >
       {label}
+      {active ? (
+        <span
+          className="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-white"
+          aria-hidden
+        />
+      ) : null}
     </Link>
   );
-}
-
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
 export function AppShell({
@@ -62,147 +71,190 @@ export function AppShell({
   jobs?: JobOption[];
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
 
-  async function lock() {
-    await fetch("/api/unlock", { method: "DELETE" });
-    window.location.href = "/unlock";
-  }
+  const moreActive = moreLinks.some((l) => isActive(pathname, l.href));
+
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
-      <aside
-        className={`border-r border-line bg-brand text-bg-elevated ${
-          open ? "fixed inset-0 z-40 block lg:static" : "hidden"
-        } lg:block`}
-      >
-        <div className="flex h-full flex-col px-5 py-6">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <Link
-                href="/"
-                className="display text-2xl tracking-tight text-white"
-                onClick={() => setOpen(false)}
-              >
-                Splitbook
-              </Link>
-              <p className="mt-1 text-sm text-white/70">
-                Two paychecks. One clear split.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="rounded-md border border-white/20 px-2 py-1 text-sm text-white/80 lg:hidden"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
-          </div>
-
-          <nav className="mt-8 flex flex-1 flex-col gap-6">
-            <div className="flex flex-col gap-1">
-              <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/45">
-                Money
-              </p>
-              {moneyLinks.map((link) => (
-                <NavLink
-                  key={link.href}
-                  href={link.href}
-                  label={link.label}
-                  active={isActive(pathname, link.href)}
-                  onClick={() => setOpen(false)}
-                />
-              ))}
-            </div>
-            <div className="flex flex-col gap-1">
-              <p className="px-3 text-[11px] uppercase tracking-[0.14em] text-white/45">
-                Setup
-              </p>
-              {setupLinks.map((link) => (
-                <NavLink
-                  key={link.href}
-                  href={link.href}
-                  label={link.label}
-                  active={isActive(pathname, link.href)}
-                  onClick={() => setOpen(false)}
-                />
-              ))}
-            </div>
-          </nav>
-
-          <button
-            type="button"
-            onClick={lock}
-            className="mt-4 rounded-md border border-white/20 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
-          >
-            Lock app
-          </button>
-        </div>
-      </aside>
-
-      <div className="flex min-h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-line bg-bg-elevated/80 px-4 py-3 backdrop-blur lg:hidden">
-          <span className="display text-lg text-brand">Splitbook</span>
-          <button
-            type="button"
-            className="rounded-md border border-line px-3 py-1.5 text-sm"
-            onClick={() => setOpen(true)}
-          >
-            Menu
-          </button>
-        </header>
-
-        <main className="flex-1 px-4 py-6 pb-24 sm:px-8 lg:px-10 lg:py-8 lg:pb-8">
-          {children}
-        </main>
-
-        <nav
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg-elevated/95 backdrop-blur lg:hidden"
-          aria-label="Mobile"
-        >
-          <div className="mx-auto grid max-w-lg grid-cols-4 px-2 py-2">
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-nav">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-baseline gap-3">
             <Link
               href="/"
-              className={`flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
-                pathname === "/" ? "text-brand" : "text-ink-muted"
-              }`}
+              className="display text-2xl tracking-tight text-white"
             >
-              <span aria-hidden>⌂</span>
-              Dashboard
+              Splitbook
             </Link>
-            <Link
-              href="/bills"
-              className={`flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
-                pathname.startsWith("/bills") ? "text-brand" : "text-ink-muted"
-              }`}
-            >
-              <span aria-hidden>$</span>
-              Bills
-            </Link>
-            {jobs.length > 0 ? (
-              <LogPaycheckButton jobs={jobs} label="Log" variant="nav" />
-            ) : (
-              <Link
-                href="/paychecks"
-                className="flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-ink-muted"
+            <p className="hidden text-xs text-white/70 sm:block">
+              Check-in notebook
+            </p>
+          </div>
+
+          <nav className="hidden items-center gap-5 md:flex" aria-label="Primary">
+            {primaryLinks.map((link) => (
+              <NavLink
+                key={link.href}
+                href={link.href}
+                label={link.label}
+                active={isActive(pathname, link.href)}
+              />
+            ))}
+            <div className="relative" ref={moreRef}>
+              <button
+                type="button"
+                className={`relative px-1 py-1 text-sm transition ${
+                  moreActive || moreOpen
+                    ? "font-semibold text-white"
+                    : "text-white/75 hover:text-white"
+                }`}
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm text-white">
-                  +
-                </span>
-                Jobs
-              </Link>
-            )}
+                More
+                {(moreActive || moreOpen) && (
+                  <span
+                    className="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-white"
+                    aria-hidden
+                  />
+                )}
+              </button>
+              {moreOpen ? (
+                <div className="absolute right-0 mt-2 min-w-[10rem] notebook-sheet py-1">
+                  {moreLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMoreOpen(false)}
+                      className={`block px-3 py-2 text-sm ${
+                        isActive(pathname, link.href)
+                          ? "bg-nav/10 font-medium text-brand"
+                          : "text-ink hover:bg-bg-elevated"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                  <div className="border-t border-line">
+                    <ThemeToggle />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <ThemeToggle variant="nav" />
+          </nav>
+
+          <div className="flex items-center gap-2 md:hidden">
+            <ThemeToggle variant="nav" />
             <button
               type="button"
-              onClick={() => setOpen(true)}
-              className="flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-ink-muted"
+              className="rounded border border-white/30 px-3 py-1.5 text-sm text-white"
+              onClick={() => setMobileOpen(true)}
             >
-              <span aria-hidden>☰</span>
-              More
+              Menu
             </button>
           </div>
-        </nav>
-      </div>
+        </div>
+      </header>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-ink/30"
+            aria-label="Close menu"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute inset-y-0 right-0 flex w-[min(18rem,88vw)] flex-col border-l border-line bg-nav p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <p className="display text-xl text-white">Splitbook</p>
+              <button
+                type="button"
+                className="text-sm text-white/80"
+                onClick={() => setMobileOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <nav className="mt-6 flex flex-col gap-1">
+              {[...primaryLinks, ...moreLinks].map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`rounded px-3 py-2.5 text-sm ${
+                    isActive(pathname, link.href)
+                      ? "bg-white/15 font-semibold text-white"
+                      : "text-white/80 hover:bg-bg-elevated/10"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-auto pt-4">
+              <ThemeToggle variant="nav" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:py-10 lg:pb-10">
+        {children}
+      </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-nav md:hidden"
+        aria-label="Mobile"
+      >
+        <div className="mx-auto grid max-w-lg grid-cols-4 px-2 py-2">
+          <Link
+            href="/"
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
+              pathname === "/" ? "text-white" : "text-white/70"
+            }`}
+          >
+            Home
+          </Link>
+          <Link
+            href="/transactions"
+            className={`flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
+              pathname.startsWith("/transactions")
+                ? "text-white"
+                : "text-white/70"
+            }`}
+          >
+            Txns
+          </Link>
+          {jobs.length > 0 ? (
+            <LogPaycheckButton jobs={jobs} label="Log" variant="nav" />
+          ) : (
+            <Link
+              href="/paychecks"
+              className="flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-white/70"
+            >
+              Jobs
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="flex flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium text-white/70"
+          >
+            More
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

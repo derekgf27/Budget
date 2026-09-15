@@ -20,6 +20,7 @@ type IncomeFormProps = {
     nextPayday?: string;
     amountVaries?: boolean;
     colorKey?: string | null;
+    depositMatch?: string | null;
   };
   submitLabel?: string;
   onSuccess?: () => void;
@@ -104,8 +105,8 @@ export function IncomeForm({
                 onClick={() => setColorKey(option.key)}
                 className={`flex h-9 w-9 items-center justify-center rounded-md border ${
                   selected
-                    ? "border-brand bg-white ring-2 ring-brand/30"
-                    : "border-line bg-white/70 hover:border-brand-soft"
+                    ? "border-brand bg-paper ring-2 ring-brand/30"
+                    : "border-line bg-paper/80 hover:border-brand-soft"
                 }`}
               >
                 <span
@@ -117,6 +118,19 @@ export function IncomeForm({
             );
           })}
         </div>
+      </Field>
+
+      <Field label="Bank deposit match">
+        <input
+          name="depositMatch"
+          className={inputClass}
+          placeholder="e.g. CIRACET or TIBER,PHSU"
+          defaultValue={initial?.depositMatch ?? ""}
+        />
+        <span className="text-xs text-ink-muted">
+          Keywords in your bank deposit description (comma-separated). Used to
+          auto-log paychecks after Sync.
+        </span>
       </Field>
 
       <Field label="Pay schedule">
@@ -157,7 +171,7 @@ export function IncomeForm({
         <input type="hidden" name="paydayDay" value="" />
       )}
 
-      <Field label="Next payday">
+      <Field label="Approx. next payday">
         <input
           name="nextPayday"
           type="date"
@@ -168,9 +182,14 @@ export function IncomeForm({
         />
         {dayHint && cadence === "monthly" ? (
           <span className="text-xs text-ink-muted">
-            Suggested from day of month: {formatDisplayDate(dayHint)}
+            Suggested from day of month: {formatDisplayDate(dayHint)}. Advances
+            automatically when a paycheck is logged.
           </span>
-        ) : null}
+        ) : (
+          <span className="text-xs text-ink-muted">
+            Rough guide only — advances automatically when a paycheck hits.
+          </span>
+        )}
       </Field>
 
       <label className="flex items-start gap-2 text-sm">

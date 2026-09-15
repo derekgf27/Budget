@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Sora, Source_Serif_4 } from "next/font/google";
+import { Figtree, Fraunces } from "next/font/google";
+import { themeBootScript } from "@/lib/theme";
 import "./globals.css";
 
-const sora = Sora({
-  variable: "--font-sora",
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
-const sourceSerif = Source_Serif_4({
-  variable: "--font-source-serif",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
 });
 
@@ -21,9 +22,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${sora.variable} ${sourceSerif.variable} h-full antialiased`}
+      suppressHydrationWarning
+      className={`${figtree.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full bg-bg text-ink">
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        {children}
+      </body>
     </html>
   );
 }

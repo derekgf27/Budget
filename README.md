@@ -20,8 +20,6 @@ Required:
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_PIN` | PIN to unlock the app (phone + desktop) |
-| `SESSION_SECRET` | Long random string used to sign the unlock cookie |
 | `DATABASE_URL` | Neon Postgres connection string |
 
 Optional (card linking):
@@ -31,6 +29,7 @@ Optional (card linking):
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` | From [Plaid Dashboard](https://dashboard.plaid.com) (sandbox) |
 | `PLAID_ENV` | `sandbox` (default) or `production` |
 | `NEXT_PUBLIC_APP_URL` | Public URL (needed for Plaid webhooks after deploy) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Optional — free Gemini key from [Google AI Studio](https://aistudio.google.com/apikey) for the AI coach |
 
 3. **Create a Neon database** (free tier is fine), paste the connection string into `DATABASE_URL`, then:
 
@@ -45,14 +44,14 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and unlock with your `APP_PIN` (default in example: `1234`).
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Deploy (phone access)
 
 1. Push the repo and import the project in [Vercel](https://vercel.com).
-2. Add a Neon integration / set `DATABASE_URL`, `APP_PIN`, `SESSION_SECRET`, and Plaid vars in the Vercel project env.
+2. Add a Neon integration / set `DATABASE_URL` and Plaid vars in the Vercel project env.
 3. Set `NEXT_PUBLIC_APP_URL` to your Vercel URL (e.g. `https://your-app.vercel.app`).
-4. Deploy. Open that URL on your phone and unlock with the same PIN.
+4. Deploy. Open that URL on your phone.
 
 ## Features
 
@@ -62,6 +61,8 @@ Open [http://localhost:3000](http://localhost:3000) and unlock with your `APP_PI
 - Money-split chart + **safe to spend** for the current paycheck window
 - Plaid Link + on-demand / webhook sync
 - CSV statement import with basic dedupe
+- Email check-in reminders (Resend)
+- Home **Coach** chat — ask about your income, bills, and spend (Gemini optional)
 
 ## Scripts
 
@@ -74,4 +75,4 @@ Open [http://localhost:3000](http://localhost:3000) and unlock with your `APP_PI
 
 ## Security
 
-This app uses a shared PIN, not full user accounts. Keep the Vercel URL private and use a strong PIN in production.
+There is no login. Keep the Vercel URL private if you deploy a personal budget.

@@ -65,7 +65,7 @@ export function AddAccountButton({ plaidEnabled }: { plaidEnabled: boolean }) {
                 ref={closeRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-white"
+                className="rounded-md border border-line px-2.5 py-1 text-sm text-ink-muted hover:bg-bg-elevated"
               >
                 Close
               </button>
@@ -85,7 +85,7 @@ export function AddAccountButton({ plaidEnabled }: { plaidEnabled: boolean }) {
               <div className="border-t border-line pt-6">
                 <h3 className="font-medium text-brand">CSV import</h3>
                 <div className="mt-3">
-                  <CsvImportForm />
+                  <CsvImportForm defaultName="Apple Card" />
                 </div>
               </div>
             </div>

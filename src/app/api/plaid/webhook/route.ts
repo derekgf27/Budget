@@ -18,6 +18,8 @@ export async function POST(request: Request) {
       .where(eq(plaidItems.itemId, body.item_id));
     if (items[0]) {
       await syncPlaidItem(items[0].id);
+      const { matchPaychecksFromDeposits } = await import("@/lib/paycheck-match");
+      await matchPaychecksFromDeposits();
     }
   }
 

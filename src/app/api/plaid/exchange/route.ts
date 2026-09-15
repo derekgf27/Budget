@@ -67,22 +67,34 @@ export async function POST(request: Request) {
       name: acct.name,
       officialName: acct.official_name ?? null,
       type: acct.type,
+      subtype: acct.subtype ?? null,
       mask: acct.mask ?? null,
       balanceCurrent: acct.balances.current?.toString() ?? null,
       balanceLimit: acct.balances.limit?.toString() ?? null,
       plaidAccountId: acct.account_id,
       plaidItemId: itemRow.id,
       source: "plaid" as const,
+      lastSyncedAt: new Date(),
     };
 
     if (found[0]) {
       await db.update(accounts).set(values).where(eq(accounts.id, found[0].id));
     } else {
-      await db.insert(accounts).values(values);
+      const institutionName = body.institution?.name ?? itemRow.institutionName;
+      let displayName: string | null = null;
+      const blob = `${acct.name} ${acct.official_name || ""} ${institutionName || ""}`.toLowerCase();
+      if (blob.includes("popular")) {
+        if (acct.subtype === "savings") displayName = "Popular savings";
+        else if (acct.type === "credit") displayName = "Popular card";
+        else displayName = "Popular checking";
+      }
+      await db.insert(accounts).values({ ...values, displayName });
     }
   }
 
   await syncPlaidItem(itemRow.id);
+  const { matchPaychecksFromDeposits } = await import("@/lib/paycheck-match");
+  await matchPaychecksFromDeposits();
 
   return NextResponse.json({ ok: true });
 }

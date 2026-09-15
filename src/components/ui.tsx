@@ -25,11 +25,11 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b border-rule pb-5">
       <div>
         <h1 className="display text-3xl text-brand md:text-4xl">{title}</h1>
         {description ? (
-          <p className="mt-2 max-w-2xl text-ink-muted">{description}</p>
+          <p className="mt-2 max-w-xl text-sm text-ink-muted">{description}</p>
         ) : null}
       </div>
       {action}
@@ -45,11 +45,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={`rounded-xl border border-line bg-bg-elevated/90 p-5 shadow-[0_1px_0_rgba(18,36,28,0.04)] ${className}`}
-    >
-      {children}
-    </section>
+    <section className={`notebook-sheet p-5 ${className}`}>{children}</section>
   );
 }
 
@@ -69,13 +65,13 @@ export function Field({
 }
 
 export const inputClass =
-  "rounded-md border border-line bg-white px-3 py-2 text-ink outline-none focus:border-brand-soft";
+  "rounded-sm border border-line bg-paper px-3 py-2 text-ink outline-none focus:border-brand-soft";
 
 export const buttonPrimaryClass =
-  "rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-soft";
+  "rounded-sm bg-nav px-4 py-2 text-sm font-medium text-white hover:opacity-90";
 
 export const buttonGhostClass =
-  "rounded-md border border-line px-3 py-2 text-sm text-ink-muted hover:bg-white";
+  "rounded-sm border border-line px-3 py-2 text-sm text-ink-muted hover:bg-bg-elevated";
 
 export const buttonDangerClass =
-  "rounded-md border border-danger/30 bg-danger px-3 py-2 text-sm font-medium text-white hover:bg-danger/90";
+  "rounded-sm border border-danger/30 bg-danger px-3 py-2 text-sm font-medium text-white hover:bg-danger/90";

@@ -1,46 +1,166 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #e7eded;
-  --bg-elevated: #f6f8f7;
-  --ink: #14201c;
-  --ink-muted: #5a6b63;
-  --brand: #0b3d34;
-  --brand-soft: #1a5c50;
-  --accent: #2f6fed;
-  --accent-soft: #dce7fb;
-  --danger: #9b2c2c;
-  --line: #c5d2cb;
-  --safe: #1f7a4c;
+  /* Cool paper — not cream/terracotta */
+  --bg: #e4e9e6;
+  --bg-elevated: #f4f6f4;
+  --paper: #f7f8f5;
+  --ink: #1a221f;
+  --ink-muted: #000000;
+  --brand: #243d34;
+  --brand-soft: #355a4a;
+  --nav: #243d34;
+  --accent: #3d6b8a;
+  --accent-soft: #d9e6ee;
+  --danger: #8f3a3a;
+  --line: #c8d2cb;
+  --rule: #d5ddd7;
+  --safe: #2a6b4a;
+  --sheet-mix: white;
+  --select-chevron: %23243d34;
+}
+
+html.dark {
+  /* Forest night — deep green desk, not purple/black glass */
+  --bg: #101612;
+  --bg-elevated: #18201c;
+  --paper: #1c2621;
+  --ink: #e8eee9;
+  --ink-muted: #b4c0b8;
+  --brand: #a3c4b0;
+  --brand-soft: #7fa892;
+  --nav: #1a2e26;
+  --accent: #7aa3bd;
+  --accent-soft: #243038;
+  --danger: #d48a8a;
+  --line: #314038;
+  --rule: #2a3530;
+  --safe: #6db892;
+  --sheet-mix: #15201b;
+  --select-chevron: %23a3c4b0;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-elevated: var(--bg-elevated);
+  --color-paper: var(--paper);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-brand: var(--brand);
   --color-brand-soft: var(--brand-soft);
+  --color-nav: var(--nav);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
   --color-line: var(--line);
+  --color-rule: var(--rule);
   --color-safe: var(--safe);
-  --font-sans: var(--font-sora);
-  --font-display: var(--font-source-serif);
+  --font-sans: var(--font-figtree);
+  --font-display: var(--font-fraunces);
 }
 
 body {
   background:
-    radial-gradient(1200px 600px at 8% -12%, #cfe0d8 0%, transparent 55%),
-    radial-gradient(800px 480px at 100% 0%, #d5dff0 0%, transparent 50%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sheet-mix) 35%, transparent) 0%,
+      transparent 180px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 27px,
+      color-mix(in srgb, var(--rule) 55%, transparent) 27px,
+      color-mix(in srgb, var(--rule) 55%, transparent) 28px
+    ),
+    radial-gradient(
+      900px 420px at 12% -8%,
+      color-mix(in srgb, var(--brand-soft) 22%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      700px 380px at 100% 0%,
+      color-mix(in srgb, var(--accent) 14%, transparent) 0%,
+      transparent 52%
+    ),
     var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
-  font-family: var(--font-sora), ui-sans-serif, sans-serif;
+  font-family: var(--font-figtree), ui-sans-serif, sans-serif;
 }
 
 h1,
-h2,
 .display {
-  font-family: var(--font-source-serif), ui-serif, Georgia, serif;
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+}
+
+h2,
+h3 {
+  font-family: var(--font-figtree), ui-sans-serif, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Notebook page sheet */
+.notebook-sheet {
+  background: color-mix(in srgb, var(--paper) 92%, var(--sheet-mix));
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--ink) 4%, transparent),
+    3px 3px 0 color-mix(in srgb, var(--nav) 6%, transparent);
+}
+
+html.dark .notebook-sheet {
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.25),
+    3px 3px 0 rgba(0, 0, 0, 0.18);
+}
+
+.notebook-margin {
+  border-left: 2px solid color-mix(in srgb, #c45c5c 35%, transparent);
+}
+
+html.dark .notebook-margin {
+  border-left-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+/* Ink-line select — notebook field, not a form box */
+.notebook-select {
+  appearance: none;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23243d34' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.15rem center;
+  background-size: 0.65rem;
+  border: none;
+  border-bottom: 1.5px solid var(--brand);
+  border-radius: 0;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  outline: none;
+  padding: 0.2rem 1.25rem 0.25rem 0.1rem;
+}
+
+html.dark .notebook-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23a3c4b0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.notebook-select:hover {
+  border-bottom-color: var(--brand-soft);
+}
+
+.notebook-select:focus {
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 var(--accent);
+}
+
+.notebook-select-pending {
+  border-bottom-color: var(--accent);
+  border-bottom-style: dashed;
+  color: var(--brand);
+  font-weight: 600;
 }

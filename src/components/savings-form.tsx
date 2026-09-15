@@ -101,7 +101,7 @@ export function SavingsForm({
               defaultValue={initial?.current ?? "0"}
             />
           </Field>
-          <Field label="Contribution per paycheck window ($)">
+          <Field label="Contribution each check-in ($)">
             <input
               name="contribution"
               required

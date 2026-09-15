@@ -21,54 +21,72 @@ export function ItemTabs({
   const [tab, setTab] = useState<"overview" | "recent">("overview");
 
   return (
-    <div className="mt-4">
-      <div className="mb-3 flex gap-1 rounded-md border border-line bg-white/60 p-0.5 w-fit">
-        <button
-          type="button"
-          onClick={() => setTab("overview")}
-          className={`rounded px-3 py-1.5 text-xs font-medium transition ${
-            tab === "overview"
-              ? "bg-brand text-white"
-              : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("recent")}
-          className={`rounded px-3 py-1.5 text-xs font-medium transition ${
-            tab === "recent"
-              ? "bg-brand text-white"
-              : "text-ink-muted hover:text-ink"
-          }`}
-        >
-          Recent
-          {transfers.length > 0 ? ` (${transfers.length})` : ""}
-        </button>
+    <div className="mt-5">
+      <div
+        className="mb-4 flex gap-5 border-b border-rule"
+        role="tablist"
+        aria-label="Item sections"
+      >
+        {(
+          [
+            ["overview", "Overview"],
+            [
+              "recent",
+              transfers.length > 0
+                ? `Recent (${transfers.length})`
+                : "Recent",
+            ],
+          ] as const
+        ).map(([key, label]) => {
+          const active = tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(key)}
+              className={`relative pb-2 text-sm transition ${
+                active
+                  ? "font-semibold text-brand"
+                  : "text-ink hover:text-brand"
+              }`}
+            >
+              {label}
+              {active ? (
+                <span
+                  className="absolute inset-x-0 -bottom-px h-0.5 bg-brand"
+                  aria-hidden
+                />
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {tab === "overview" ? (
         overview
       ) : transfers.length === 0 ? (
-        <p className="text-sm text-ink-muted">No activity yet for this item.</p>
+        <p className="text-sm text-ink">No activity yet for this item.</p>
       ) : (
-        <ul className="divide-y divide-line rounded-lg border border-line bg-white/70">
+        <ul className="divide-y divide-rule border-t border-rule">
           {transfers.map((t) => (
             <li
               key={t.id}
-              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm"
             >
               <div>
-                <p className="text-ink-muted">
+                <p className="font-medium">
+                  {t.amountCents >= 0 ? "Deposit" : "Withdrawal"}
+                </p>
+                <p className="mt-0.5 text-xs text-ink">
                   {formatDisplayDate(t.transferredOn)}
-                  {t.amountCents >= 0 ? " · Deposit" : " · Withdrawal"}
                   {t.note ? ` · ${t.note}` : ""}
                 </p>
               </div>
               <Money
                 cents={t.amountCents}
-                className={`font-medium ${
+                className={`font-semibold tabular-nums ${
                   t.amountCents >= 0 ? "text-safe" : "text-danger"
                 }`}
               />

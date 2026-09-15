@@ -15,9 +15,9 @@ const statusStyles: Record<
     label: "Upcoming",
     className: "bg-accent-soft text-brand",
   },
-  overdue: {
-    label: "Overdue",
-    className: "bg-danger/10 text-danger",
+  unpaid: {
+    label: "Unpaid",
+    className: "bg-accent-soft text-brand",
   },
 };
 
