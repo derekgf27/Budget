@@ -129,7 +129,7 @@ export function IncomeForm({
         />
         <span className="text-xs text-ink-muted">
           Keywords in your bank deposit description (comma-separated). Used to
-          auto-log paychecks after Sync.
+          auto-log paychecks from imported statements.
         </span>
       </Field>
 

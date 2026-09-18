@@ -2,10 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { CsvImportForm } from "@/components/csv-import";
-import { PlaidConnectButton, SyncPlaidButton } from "@/components/plaid-connect";
 import { buttonPrimaryClass } from "@/components/ui";
 
-export function AddAccountButton({ plaidEnabled }: { plaidEnabled: boolean }) {
+export function AddAccountButton() {
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -58,7 +57,7 @@ export function AddAccountButton({ plaidEnabled }: { plaidEnabled: boolean }) {
                   Add an account
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  Connect with Plaid or import a CSV statement.
+                  Import a CSV statement from your bank or card.
                 </p>
               </div>
               <button
@@ -71,24 +70,7 @@ export function AddAccountButton({ plaidEnabled }: { plaidEnabled: boolean }) {
               </button>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <h3 className="font-medium text-brand">Plaid</h3>
-                <p className="mt-1 text-sm text-ink-muted">
-                  Link a bank or card, then sync transactions on demand.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  <PlaidConnectButton enabled={plaidEnabled} />
-                  {plaidEnabled ? <SyncPlaidButton /> : null}
-                </div>
-              </div>
-              <div className="border-t border-line pt-6">
-                <h3 className="font-medium text-brand">CSV import</h3>
-                <div className="mt-3">
-                  <CsvImportForm defaultName="Apple Card" />
-                </div>
-              </div>
-            </div>
+            <CsvImportForm defaultName="Apple Card" onDone={() => setOpen(false)} />
           </div>
         </div>
       ) : null}

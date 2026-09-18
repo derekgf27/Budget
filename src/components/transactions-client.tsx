@@ -350,7 +350,7 @@ export function TransactionsClient({
       {txs.length === 0 ? (
         <div className="notebook-sheet py-10 text-center">
           <p>
-            No transactions yet — sync Popular or import your Apple Card CSV.
+            No transactions yet — import a CSV statement from Accounts.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button

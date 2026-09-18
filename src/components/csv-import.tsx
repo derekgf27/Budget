@@ -69,8 +69,8 @@ export function CsvImportForm({
       </button>
       {message ? <p className="text-sm text-ink-muted">{message}</p> : null}
       <p className="text-xs text-ink-muted">
-        Use CSV from card.apple.com → Export Transactions (not the PDF
-        statement). Columns like Date, Description, Amount.
+        Export a CSV from your bank or card (Date, Description, Amount columns).
+        Apple Card: card.apple.com → Export Transactions (not the PDF).
       </p>
     </form>
   );

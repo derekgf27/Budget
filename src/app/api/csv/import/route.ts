@@ -183,7 +183,7 @@ export async function POST(request: Request) {
     }
 
     let amountCents = dollarsToCents(amountRaw);
-    // Credits / refunds → negative (income-style) in our Plaid convention
+    // Credits / refunds → negative (income-style) in our spend convention
     if (type.includes("credit") || type.includes("refund")) {
       amountCents = -Math.abs(amountCents);
     } else if (amountCents < 0) {

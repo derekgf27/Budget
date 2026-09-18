@@ -39,17 +39,10 @@ export function accountLabel(account: AccountLike): string {
 }
 
 export function isEmptyDuplicateAccount(
-  account: AccountLike,
-  all: AccountLike[],
+  _account: AccountLike,
+  _all: AccountLike[],
 ): boolean {
-  const bal = Number(account.balanceCurrent ?? 0);
-  if (account.source !== "plaid" || !account.mask || bal !== 0) return false;
-  return all.some(
-    (other) =>
-      other.id !== account.id &&
-      other.mask === account.mask &&
-      Number(other.balanceCurrent ?? 0) > 0,
-  );
+  return false;
 }
 
 export function visibleAccounts<T extends AccountLike>(all: T[]): T[] {

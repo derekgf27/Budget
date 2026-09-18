@@ -34,7 +34,7 @@ export default async function PaychecksPage() {
     <div>
       <PageHeader
         title="Paychecks"
-        description="Jobs auto-log from bank deposits when Sync finds a match."
+        description="Jobs can auto-log from imported deposit matches."
         action={
           <div className="flex flex-wrap items-start justify-end gap-2">
             <ScanPaychecksButton />

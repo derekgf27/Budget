@@ -20,22 +20,16 @@ import {
 type AccountActionsProps = {
   id: string;
   label: string;
-  source: string;
   balance: string | null;
-  canSync: boolean;
 };
 
 export function AccountActions({
   id,
   label,
-  source,
   balance,
-  canSync,
 }: AccountActionsProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"rename" | "balance" | "import" | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -54,50 +48,16 @@ export function AccountActions({
     };
   }, [mode]);
 
-  async function sync() {
-    setBusy(true);
-    setMessage("");
-    const res = await fetch("/api/plaid/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accountId: id }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setMessage(data.error || "Sync failed");
-      return;
-    }
-    setMessage(
-      data.paychecks?.logged || data.paychecks?.updated
-        ? `Synced · ${data.paychecks.logged || 0} paycheck(s) logged`
-        : "Synced",
-    );
-    router.refresh();
-  }
-
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        {canSync ? (
-          <button
-            type="button"
-            className={buttonGhostClass}
-            disabled={busy}
-            onClick={() => void sync()}
-          >
-            {busy ? "Syncing…" : "Sync"}
-          </button>
-        ) : null}
-        {source === "csv" ? (
-          <button
-            type="button"
-            className={buttonGhostClass}
-            onClick={() => setMode("import")}
-          >
-            Import CSV
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={buttonGhostClass}
+          onClick={() => setMode("import")}
+        >
+          Import CSV
+        </button>
         <button
           type="button"
           className={buttonGhostClass}
@@ -105,15 +65,13 @@ export function AccountActions({
         >
           Rename
         </button>
-        {source === "csv" ? (
-          <button
-            type="button"
-            className={buttonGhostClass}
-            onClick={() => setMode("balance")}
-          >
-            Balance
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={buttonGhostClass}
+          onClick={() => setMode("balance")}
+        >
+          Balance
+        </button>
         <form action={hideAccount}>
           <input type="hidden" name="id" value={id} />
           <input type="hidden" name="hidden" value="true" />
@@ -134,7 +92,6 @@ export function AccountActions({
           <input type="hidden" name="id" value={id} />
         </ConfirmDeleteForm>
       </div>
-      {message ? <p className="mt-1 text-xs text-ink-muted">{message}</p> : null}
 
       {mode ? (
         <div

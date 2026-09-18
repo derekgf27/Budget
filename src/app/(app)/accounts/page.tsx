@@ -1,19 +1,19 @@
 import { desc, eq } from "drizzle-orm";
 import { AccountActions } from "@/components/account-actions";
 import { AddAccountButton } from "@/components/add-account-button";
-import { SyncPlaidButton } from "@/components/plaid-connect";
 import { hideAccount } from "@/app/actions";
 import { PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
-import { accounts, plaidItems } from "@/db/schema";
-import { accountLabel, formatSyncedAt, isEmptyDuplicateAccount } from "@/lib/accounts";
-import { hasPlaid } from "@/lib/plaid";
+import { accounts } from "@/db/schema";
+import {
+  accountLabel,
+  formatSyncedAt,
+  isEmptyDuplicateAccount,
+} from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
-type AccountRow = typeof accounts.$inferSelect & {
-  institutionName?: string | null;
-};
+type AccountRow = typeof accounts.$inferSelect;
 
 function AccountList({
   title,
@@ -31,10 +31,7 @@ function AccountList({
       <h2 className="display mb-3 text-xl text-brand">{title}</h2>
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-bg-elevated/90">
         {items.map((a) => {
-          const label = accountLabel({
-            ...a,
-            institutionName: a.institutionName,
-          });
+          const label = accountLabel(a);
           const synced = formatSyncedAt(a.lastSyncedAt);
           const balance =
             a.balanceCurrent != null ? Number(a.balanceCurrent).toFixed(2) : null;
@@ -54,9 +51,7 @@ function AccountList({
                 <p className="mt-0.5 text-sm text-ink-muted">
                   {a.type}
                   {a.subtype ? ` · ${a.subtype}` : ""} · {a.source}
-                  {synced
-                    ? ` · ${a.source === "csv" ? "Imported" : "Synced"} ${synced}`
-                    : ""}
+                  {synced ? ` · Imported ${synced}` : ""}
                 </p>
               </div>
               <p className="shrink-0 text-lg font-medium">
@@ -78,9 +73,7 @@ function AccountList({
                   <AccountActions
                     id={a.id}
                     label={label}
-                    source={a.source}
                     balance={balance}
-                    canSync={a.source === "plaid" && Boolean(a.plaidItemId)}
                   />
                 )}
               </div>
@@ -107,23 +100,9 @@ export default async function AccountsPage({
   const showHidden = params.showHidden === "1";
 
   const db = getDb();
-  const [rows, items] = await Promise.all([
-    db.select().from(accounts).orderBy(desc(accounts.createdAt)),
-    db.select().from(plaidItems),
-  ]);
-  const institutionByItem = new Map(
-    items.map((i) => [i.id, i.institutionName]),
-  );
+  const rows = await db.select().from(accounts).orderBy(desc(accounts.createdAt));
 
-  const enriched: AccountRow[] = rows.map((a) => ({
-    ...a,
-    institutionName: a.plaidItemId
-      ? institutionByItem.get(a.plaidItemId) ?? null
-      : null,
-  }));
-
-  // Backfill display names for Popular / Apple once
-  for (const a of enriched) {
+  for (const a of rows) {
     if (a.displayName) continue;
     const label = accountLabel(a);
     if (label !== a.name) {
@@ -135,11 +114,11 @@ export default async function AccountsPage({
     }
   }
 
-  const visible = enriched.filter(
-    (a) => !a.hidden && !isEmptyDuplicateAccount(a, enriched),
+  const visible = rows.filter(
+    (a) => !a.hidden && !isEmptyDuplicateAccount(a, rows),
   );
-  const hiddenRows = enriched.filter(
-    (a) => a.hidden || isEmptyDuplicateAccount(a, enriched),
+  const hiddenRows = rows.filter(
+    (a) => a.hidden || isEmptyDuplicateAccount(a, rows),
   );
 
   const bankAccounts = visible.filter((a) => a.type === "depository");
@@ -148,20 +127,12 @@ export default async function AccountsPage({
     (a) => a.type !== "depository" && a.type !== "credit",
   );
 
-  const plaidEnabled = hasPlaid();
-  const hasPlaidAccounts = visible.some((a) => a.source === "plaid");
-
   return (
     <div>
       <PageHeader
         title="Accounts"
-        description="Banks and cards for balances and spending."
-        action={
-          <div className="flex flex-wrap gap-2">
-            {plaidEnabled && hasPlaidAccounts ? <SyncPlaidButton /> : null}
-            <AddAccountButton plaidEnabled={plaidEnabled} />
-          </div>
-        }
+        description="Import bank and card statements as CSV."
+        action={<AddAccountButton />}
       />
 
       {visible.length === 0 && !showHidden ? (
@@ -169,7 +140,7 @@ export default async function AccountsPage({
           <div className="py-10 text-center">
             <p className="text-ink-muted">No accounts yet.</p>
             <div className="mt-4 flex justify-center">
-              <AddAccountButton plaidEnabled={plaidEnabled} />
+              <AddAccountButton />
             </div>
           </div>
         </Panel>
@@ -199,11 +170,7 @@ export default async function AccountsPage({
               >
                 Hide empty / hidden accounts
               </a>
-              <AccountList
-                title="Hidden"
-                items={hiddenRows}
-                showHidden
-              />
+              <AccountList title="Hidden" items={hiddenRows} showHidden />
             </>
           )}
         </div>
