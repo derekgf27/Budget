@@ -5,7 +5,7 @@ import { ConfirmDeleteForm } from "@/components/confirm-delete";
 import { EditJobButton } from "@/components/edit-job-button";
 import { JobDot } from "@/components/job-tag";
 import { LogPaycheckButton } from "@/components/log-paycheck-button";
-import { ScanPaychecksButton } from "@/components/scan-paychecks-button";
+import { MatchDepositsButton } from "@/components/match-deposits-button";
 import { Money, PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
 import { incomeSources, paycheckLogs } from "@/db/schema";
@@ -37,7 +37,7 @@ export default async function PaychecksPage() {
         description="Jobs can auto-log from imported deposit matches."
         action={
           <div className="flex flex-wrap items-start justify-end gap-2">
-            <ScanPaychecksButton />
+            <MatchDepositsButton />
             <AddJobButton />
           </div>
         }
@@ -69,11 +69,11 @@ export default async function PaychecksPage() {
                       </p>
                       {inc.depositMatch ? (
                         <p className="mt-0.5 text-xs text-ink-muted">
-                          Bank match: {inc.depositMatch}
+                          Deposit match: {inc.depositMatch}
                         </p>
                       ) : (
                         <p className="mt-0.5 text-xs text-amber-800/80">
-                          Set a bank match keyword in Edit
+                          Set a deposit match keyword in Edit
                         </p>
                       )}
                       {latest ? (

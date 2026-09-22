@@ -28,7 +28,7 @@ import {
   getSafeSpendGuardrail,
 } from "@/lib/habits";
 import { computeMoneySplit, type Cadence } from "@/lib/money";
-import { accountLabel, visibleAccounts } from "@/lib/accounts";
+import { accountLabel, formatImportedAt, visibleAccounts } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -192,12 +192,22 @@ export default async function DashboardPage({
   );
 
   const accountRowsVisible = visibleAccounts(accountRows);
+  const hasAccounts = accountRowsVisible.length > 0;
+  const importDone = accountRowsVisible.some((a) => {
+    if (!a.lastImportedAt) return false;
+    const d =
+      a.lastImportedAt instanceof Date
+        ? a.lastImportedAt
+        : new Date(a.lastImportedAt);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.toISOString().slice(0, 10) >= split.halfStart;
+  });
 
   return (
     <div>
       <PageHeader
         title={split.monthLabel}
-        description={`${split.halfLabel} check-in · categorize, bills, savings.`}
+        description={`${split.halfLabel} check-in · import, categorize, bills, savings.`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <MonthPicker monthKey={monthKey} basePath="/" />
@@ -240,6 +250,8 @@ export default async function DashboardPage({
 
           <MonthChecklist
             halfLabel={split.halfLabel}
+            importDone={importDone}
+            hasAccounts={hasAccounts}
             uncategorizedCount={uncategorizedCount}
             unpaidBills={unpaidThisMonth}
             savingsItems={savingsItems}
@@ -265,28 +277,40 @@ export default async function DashboardPage({
                 Accounts
               </Link>
             </div>
+            <p className="mt-1 text-[11px] text-ink-muted">
+              Snapshot from last import — not live.
+            </p>
             {accountRowsVisible.length === 0 ? (
               <p className="mt-2 text-sm text-ink-muted">
-                Connect an account on Accounts.
+                Import a statement on Accounts.
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
-                {accountRowsVisible.map((a) => (
-                  <li
-                    key={a.id}
-                    className="flex items-center justify-between gap-2 text-sm"
-                  >
-                    <span className="min-w-0 truncate text-ink-muted">
-                      {accountLabel(a)}
-                      {a.mask ? <span> ···{a.mask}</span> : null}
-                    </span>
-                    <span className="shrink-0 font-medium tabular-nums">
-                      {a.balanceCurrent != null && a.balanceCurrent !== ""
-                        ? `$${Number(a.balanceCurrent).toFixed(2)}`
-                        : "—"}
-                    </span>
-                  </li>
-                ))}
+                {accountRowsVisible.map((a) => {
+                  const imported = formatImportedAt(a.lastImportedAt);
+                  return (
+                    <li
+                      key={a.id}
+                      className="flex items-center justify-between gap-2 text-sm"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-ink-muted">
+                          {accountLabel(a)}
+                        </span>
+                        {imported ? (
+                          <span className="block text-[11px] text-ink-muted/80">
+                            As of {imported}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 font-medium tabular-nums">
+                        {a.balanceCurrent != null && a.balanceCurrent !== ""
+                          ? `$${Number(a.balanceCurrent).toFixed(2)}`
+                          : "—"}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

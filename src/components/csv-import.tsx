@@ -2,15 +2,18 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CsvExportGuide } from "@/components/csv-export-guide";
 import { Field, buttonPrimaryClass, inputClass } from "@/components/ui";
 
 export function CsvImportForm({
   accountId,
-  defaultName = "Apple Card",
+  defaultName = "",
+  defaultType = "depository",
   onDone,
 }: {
   accountId?: string;
   defaultName?: string;
+  defaultType?: "credit" | "depository";
   onDone?: () => void;
 }) {
   const router = useRouter();
@@ -30,8 +33,12 @@ export function CsvImportForm({
       setMessage(data.error || "Import failed");
       return;
     }
+    const paycheckBits =
+      data.paychecks?.logged || data.paychecks?.updated
+        ? ` · ${data.paychecks.logged || 0} paycheck(s) matched`
+        : "";
     setMessage(
-      `Imported ${data.imported} transactions (${data.skipped} skipped).`,
+      `Imported ${data.imported} transactions (${data.skipped} skipped)${paycheckBits}.`,
     );
     form.reset();
     router.refresh();
@@ -44,16 +51,29 @@ export function CsvImportForm({
         <input type="hidden" name="accountId" value={accountId} />
       ) : null}
       {!accountId ? (
-        <Field label="Account name">
-          <input
-            name="accountName"
-            className={inputClass}
-            defaultValue={defaultName}
-            required
-          />
-        </Field>
+        <>
+          <Field label="Account name">
+            <input
+              name="accountName"
+              className={inputClass}
+              defaultValue={defaultName}
+              placeholder="e.g. Popular checking or Apple Card"
+              required
+            />
+          </Field>
+          <Field label="Account type">
+            <select
+              name="accountType"
+              className={inputClass}
+              defaultValue={defaultType}
+            >
+              <option value="depository">Bank (checking / savings)</option>
+              <option value="credit">Card</option>
+            </select>
+          </Field>
+        </>
       ) : null}
-      <Field label="Current balance (optional)">
+      <Field label="Balance as of this statement (optional)">
         <input
           name="balance"
           className={inputClass}
@@ -62,16 +82,28 @@ export function CsvImportForm({
         />
       </Field>
       <Field label="CSV file">
-        <input name="file" type="file" accept=".csv,text/csv" required />
+        <input
+          name="file"
+          type="file"
+          accept=".csv"
+          required
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            if (!file) return;
+            if (!file.name.toLowerCase().endsWith(".csv")) {
+              setMessage("Please choose a .csv file.");
+              e.currentTarget.value = "";
+            } else {
+              setMessage("");
+            }
+          }}
+        />
       </Field>
       <button type="submit" disabled={busy} className={buttonPrimaryClass}>
         {busy ? "Importing…" : "Import CSV"}
       </button>
       {message ? <p className="text-sm text-ink-muted">{message}</p> : null}
-      <p className="text-xs text-ink-muted">
-        Export a CSV from your bank or card (Date, Description, Amount columns).
-        Apple Card: card.apple.com → Export Transactions (not the PDF).
-      </p>
+      <CsvExportGuide />
     </form>
   );
 }

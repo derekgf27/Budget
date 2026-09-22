@@ -31,7 +31,7 @@ export function AddAccountButton() {
         className={buttonPrimaryClass}
         onClick={() => setOpen(true)}
       >
-        Add account
+        Import statement
       </button>
 
       {open ? (
@@ -54,10 +54,10 @@ export function AddAccountButton() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 id={titleId} className="display text-2xl text-brand">
-                  Add an account
+                  Import statement
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  Import a CSV statement from your bank or card.
+                  Add a bank or card by importing its CSV.
                 </p>
               </div>
               <button
@@ -70,7 +70,7 @@ export function AddAccountButton() {
               </button>
             </div>
 
-            <CsvImportForm defaultName="Apple Card" onDone={() => setOpen(false)} />
+            <CsvImportForm onDone={() => setOpen(false)} />
           </div>
         </div>
       ) : null}

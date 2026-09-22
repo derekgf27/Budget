@@ -96,15 +96,12 @@ export const accounts = pgTable("accounts", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   displayName: text("display_name"),
-  officialName: text("official_name"),
-  type: text("type").notNull().default("credit"), // credit | depository | other
+  type: text("type").notNull().default("depository"), // credit | depository | other
   subtype: text("subtype"), // checking | savings | credit card | …
-  mask: text("mask"),
   balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
-  balanceLimit: numeric("balance_limit", { precision: 12, scale: 2 }),
   source: text("source").notNull().default("csv"), // csv | manual
   hidden: boolean("hidden").notNull().default(false),
-  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -116,13 +113,10 @@ export const transactions = pgTable("transactions", {
   categoryId: uuid("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
-  /** Optional dedupe key from statement import. */
-  importId: text("import_id"),
   date: text("date").notNull(), // YYYY-MM-DD
   name: text("name").notNull(),
   merchantName: text("merchant_name"),
   amountCents: integer("amount_cents").notNull(), // positive = expense
-  pending: boolean("pending").notNull().default(false),
   excluded: boolean("excluded").notNull().default(false),
   source: text("source").notNull().default("csv"), // csv | manual
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

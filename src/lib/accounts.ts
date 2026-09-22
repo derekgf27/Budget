@@ -4,24 +4,19 @@ export type AccountLike = {
   id: string;
   name: string;
   displayName?: string | null;
-  officialName?: string | null;
   type: string;
   subtype?: string | null;
   source: string;
-  mask?: string | null;
   balanceCurrent?: string | number | null;
   hidden?: boolean | null;
-  institutionName?: string | null;
 };
 
 export function accountLabel(account: AccountLike): string {
   if (account.displayName?.trim()) return account.displayName.trim();
 
-  const blob = `${account.name} ${account.officialName || ""} ${account.institutionName || ""}`.toLowerCase();
+  const blob = `${account.name}`.toLowerCase();
 
-  if (account.source === "csv" && blob.includes("apple")) {
-    return "Apple Card";
-  }
+  if (blob.includes("apple")) return "Apple Card";
 
   if (blob.includes("popular")) {
     if (
@@ -38,18 +33,11 @@ export function accountLabel(account: AccountLike): string {
   return account.name;
 }
 
-export function isEmptyDuplicateAccount(
-  _account: AccountLike,
-  _all: AccountLike[],
-): boolean {
-  return false;
-}
-
 export function visibleAccounts<T extends AccountLike>(all: T[]): T[] {
-  return all.filter((a) => !a.hidden && !isEmptyDuplicateAccount(a, all));
+  return all.filter((a) => !a.hidden);
 }
 
-export function formatSyncedAt(
+export function formatImportedAt(
   value: Date | string | null | undefined,
 ): string | null {
   if (!value) return null;

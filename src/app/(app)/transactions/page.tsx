@@ -67,7 +67,6 @@ export default async function TransactionsPage() {
           name: t.name,
           merchantName: t.merchantName,
           amountCents: t.amountCents,
-          pending: t.pending,
           excluded: t.excluded,
           source: t.source,
           createdAt: t.createdAt.toISOString(),

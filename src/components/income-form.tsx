@@ -120,7 +120,7 @@ export function IncomeForm({
         </div>
       </Field>
 
-      <Field label="Bank deposit match">
+      <Field label="Deposit match">
         <input
           name="depositMatch"
           className={inputClass}
@@ -128,8 +128,8 @@ export function IncomeForm({
           defaultValue={initial?.depositMatch ?? ""}
         />
         <span className="text-xs text-ink-muted">
-          Keywords in your bank deposit description (comma-separated). Used to
-          auto-log paychecks from imported statements.
+          Keywords in imported deposit descriptions (comma-separated). Used to
+          auto-log paychecks from statements.
         </span>
       </Field>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CategorySelect } from "@/components/category-select";
+import { AddTransactionButton } from "@/components/add-transaction-button";
 import { CsvImportForm } from "@/components/csv-import";
 import { buttonGhostClass, buttonPrimaryClass, inputClass } from "@/components/ui";
 import { categoryColor } from "@/lib/category-colors";
@@ -21,7 +22,6 @@ export type TxRow = {
   name: string;
   merchantName: string | null;
   amountCents: number;
-  pending: boolean;
   excluded: boolean;
   source: string;
   createdAt: string;
@@ -245,6 +245,7 @@ export function TransactionsClient({
             onClick={() => setSortBy("category")}
             label="Category"
           />
+          <AddTransactionButton accounts={accounts} categories={cats} />
           <div className="relative">
             <button
               type="button"
@@ -264,8 +265,17 @@ export function TransactionsClient({
                     setToolsOpen(false);
                   }}
                 >
-                  Import Apple Card CSV
+                  Import CSV
                 </button>
+                <a
+                  href="https://card.apple.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-3 py-2 text-sm hover:bg-brand/5"
+                  onClick={() => setToolsOpen(false)}
+                >
+                  Open Apple Card
+                </a>
                 <Link
                   href="/accounts"
                   className="block px-3 py-2 text-sm hover:bg-brand/5"
@@ -326,7 +336,7 @@ export function TransactionsClient({
       {importOpen ? (
         <div className="mb-4 notebook-sheet p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">Import Apple Card CSV</p>
+            <p className="text-sm font-medium">Import CSV</p>
             <button
               type="button"
               className="text-sm text-ink underline-offset-2 hover:underline"
@@ -336,11 +346,31 @@ export function TransactionsClient({
             </button>
           </div>
           <CsvImportForm
-            accountId={appleAccountId || undefined}
-            defaultName="Apple Card"
+            accountId={
+              accountFilter !== "all"
+                ? accountFilter
+                : appleAccountId || undefined
+            }
+            defaultName={
+              accountFilter !== "all"
+                ? labelById.get(accountFilter) || ""
+                : "Apple Card"
+            }
+            defaultType={
+              (accountFilter !== "all"
+                ? labelById.get(accountFilter)
+                : "Apple Card"
+              )
+                ?.toLowerCase()
+                .includes("card")
+                ? "credit"
+                : "depository"
+            }
             onDone={() => {
               setImportOpen(false);
-              if (appleAccountId) setAccountFilter(appleAccountId);
+              const nextId =
+                accountFilter !== "all" ? accountFilter : appleAccountId;
+              if (nextId) setAccountFilter(nextId);
               router.refresh();
             }}
           />
@@ -358,7 +388,7 @@ export function TransactionsClient({
               className={buttonPrimaryClass}
               onClick={() => setImportOpen(true)}
             >
-              Import Apple Card CSV
+              Import CSV
             </button>
             <Link href="/accounts" className={buttonGhostClass}>
               Go to Accounts
@@ -371,26 +401,18 @@ export function TransactionsClient({
         </div>
       ) : filtered.length === 0 ? (
         <div className="notebook-sheet py-10 text-center">
-          <p>
-            No transactions match these filters.
-            {accountFilter === appleAccountId
-              ? " Import a CSV from card.apple.com."
-              : ""}
-          </p>
-          {accountFilter === appleAccountId ? (
-            <div className="mt-4 flex justify-center">
-              <button
-                type="button"
-                className={buttonPrimaryClass}
-                onClick={() => setImportOpen(true)}
-              >
-                Import Apple Card CSV
-              </button>
-            </div>
-          ) : (
+          <p>No transactions match these filters.</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button
               type="button"
-              className="mt-4 text-sm font-medium text-brand underline-offset-2 hover:underline"
+              className={buttonPrimaryClass}
+              onClick={() => setImportOpen(true)}
+            >
+              Import CSV
+            </button>
+            <button
+              type="button"
+              className="text-sm font-medium text-brand underline-offset-2 hover:underline"
               onClick={() => {
                 setUncategorizedOnly(false);
                 setAccountFilter("all");
@@ -398,7 +420,7 @@ export function TransactionsClient({
             >
               Clear filters
             </button>
-          )}
+          </div>
         </div>
       ) : (
         <>
@@ -491,7 +513,6 @@ export function TransactionsClient({
                             ? ` · ${shortAccountMeta(accountLabel)}`
                             : ""}
                           {isDeposit ? " · Deposit" : ""}
-                          {tx.pending ? " · Pending" : ""}
                         </p>
                       </div>
 

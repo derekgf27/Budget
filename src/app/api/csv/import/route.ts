@@ -23,7 +23,10 @@ function pick(row: CsvRow, keys: string[]): string {
   for (const key of keys) {
     const want = key.toLowerCase();
     const soft = entries.find(
-      (e) => e.norm.startsWith(want) || e.norm.includes(`(${want})`) || e.norm.includes(want),
+      (e) =>
+        e.norm.startsWith(want) ||
+        e.norm.includes(`(${want})`) ||
+        e.norm.includes(want),
     );
     if (soft && row[soft.raw]?.trim()) return row[soft.raw].trim();
   }
@@ -45,11 +48,25 @@ function normalizeDate(raw: string): string | null {
   return null;
 }
 
+function resolveAccountType(
+  raw: string,
+  accountName: string,
+): "credit" | "depository" {
+  if (raw === "credit" || raw === "depository") return raw;
+  const blob = accountName.toLowerCase();
+  if (blob.includes("card") || blob.includes("apple")) return "credit";
+  return "depository";
+}
+
 export async function POST(request: Request) {
   const form = await request.formData();
   const file = form.get("file");
-  const accountName = String(form.get("accountName") || "Apple Card").trim();
+  const accountName = String(form.get("accountName") || "Checking").trim();
   const accountId = String(form.get("accountId") || "").trim();
+  const accountType = resolveAccountType(
+    String(form.get("accountType") || "").trim(),
+    accountName,
+  );
   const balanceRaw = String(form.get("balance") || "").trim();
 
   if (!(file instanceof File)) {
@@ -60,7 +77,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "That looks like a PDF. Export CSV from card.apple.com (Export Transactions), not the PDF statement.",
+          "That looks like a PDF. Export a CSV statement (not the PDF).",
       },
       { status: 400 },
     );
@@ -92,20 +109,9 @@ export async function POST(request: Request) {
     account = existingAccounts[0];
   }
 
-  // Prefer existing Apple Card account even if the form name differs
-  if (!account) {
-    const allCsv = await db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.source, "csv"));
-    account = allCsv.find((a) =>
-      `${a.name} ${a.displayName || ""}`.toLowerCase().includes("apple"),
-    );
-  }
-
   const balanceCurrent =
     balanceRaw === "" ? undefined : balanceRaw.replace(/[$,]/g, "");
-  const syncedAt = new Date();
+  const importedAt = new Date();
 
   if (!account) {
     const displayName = accountName.toLowerCase().includes("apple")
@@ -116,10 +122,11 @@ export async function POST(request: Request) {
       .values({
         name: accountName,
         displayName,
-        type: "credit",
+        type: accountType,
+        subtype: accountType === "credit" ? "credit card" : "checking",
         source: "csv",
         balanceCurrent: balanceCurrent ?? null,
-        lastSyncedAt: syncedAt,
+        lastImportedAt: importedAt,
       })
       .returning();
     account = inserted[0];
@@ -128,12 +135,12 @@ export async function POST(request: Request) {
       .update(accounts)
       .set({
         ...(balanceCurrent !== undefined ? { balanceCurrent } : {}),
-        lastSyncedAt: syncedAt,
+        lastImportedAt: importedAt,
         ...(account.source === "csv" && !account.displayName
           ? {
               displayName: accountName.toLowerCase().includes("apple")
                 ? "Apple Card"
-                : account.displayName,
+                : accountName,
             }
           : {}),
       })
@@ -152,11 +159,7 @@ export async function POST(request: Request) {
       "clearing date",
     ]);
     const merchant = pick(row, ["merchant", "merchant name", "payee"]);
-    const description = pick(row, [
-      "description",
-      "name",
-      "transaction",
-    ]);
+    const description = pick(row, ["description", "name", "transaction"]);
     const name = merchant || description;
     const amountRaw = pick(row, [
       "amount (usd)",
@@ -164,6 +167,7 @@ export async function POST(request: Request) {
       "debit",
       "charge",
       "transaction amount",
+      "credit",
     ]);
     const type = pick(row, ["type", "transaction type"]).toLowerCase();
     const date = normalizeDate(dateRaw);
@@ -176,7 +180,7 @@ export async function POST(request: Request) {
     if (
       type.includes("payment") ||
       name.toLowerCase().includes("payment thank you") ||
-      name.toLowerCase().includes("ach deposit")
+      name.toLowerCase().includes("ach deposit payment")
     ) {
       skipped += 1;
       continue;
@@ -187,7 +191,7 @@ export async function POST(request: Request) {
     if (type.includes("credit") || type.includes("refund")) {
       amountCents = -Math.abs(amountCents);
     } else if (amountCents < 0) {
-      // Already signed refund in CSV
+      // Already signed refund/deposit in CSV
     } else {
       amountCents = Math.abs(amountCents);
     }
@@ -223,15 +227,27 @@ export async function POST(request: Request) {
   const { tidyTransactionsForSpend } = await import("@/lib/spend-tidy");
   await tidyTransactionsForSpend();
 
+  let paychecks = { logged: 0, updated: 0 };
+  try {
+    const { matchPaychecksFromDeposits } = await import(
+      "@/lib/paycheck-match"
+    );
+    paychecks = await matchPaychecksFromDeposits();
+  } catch {
+    /* matching is best-effort */
+  }
+
   revalidatePath("/transactions");
   revalidatePath("/accounts");
   revalidatePath("/");
   revalidatePath("/budget");
+  revalidatePath("/paychecks");
 
   return NextResponse.json({
     ok: true,
     imported,
     skipped,
     accountId: account.id,
+    paychecks,
   });
 }

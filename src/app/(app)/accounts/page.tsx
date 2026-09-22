@@ -5,11 +5,7 @@ import { hideAccount } from "@/app/actions";
 import { PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
 import { accounts } from "@/db/schema";
-import {
-  accountLabel,
-  formatSyncedAt,
-  isEmptyDuplicateAccount,
-} from "@/lib/accounts";
+import { accountLabel, formatImportedAt } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +28,17 @@ function AccountList({
       <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-bg-elevated/90">
         {items.map((a) => {
           const label = accountLabel(a);
-          const synced = formatSyncedAt(a.lastSyncedAt);
+          const imported = formatImportedAt(a.lastImportedAt);
           const balance =
             a.balanceCurrent != null ? Number(a.balanceCurrent).toFixed(2) : null;
+          const kind =
+            a.type === "depository"
+              ? a.subtype === "savings"
+                ? "Savings"
+                : "Checking"
+              : a.type === "credit"
+                ? "Card"
+                : a.type;
 
           return (
             <li
@@ -42,21 +46,20 @@ function AccountList({
               className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
             >
               <div className="min-w-0 flex-1">
-                <p className="font-medium">
-                  {label}
-                  {a.mask ? (
-                    <span className="text-ink-muted"> ···{a.mask}</span>
-                  ) : null}
-                </p>
+                <p className="font-medium">{label}</p>
                 <p className="mt-0.5 text-sm text-ink-muted">
-                  {a.type}
-                  {a.subtype ? ` · ${a.subtype}` : ""} · {a.source}
-                  {synced ? ` · Imported ${synced}` : ""}
+                  {kind}
+                  {imported ? ` · Imported ${imported}` : ""}
                 </p>
               </div>
-              <p className="shrink-0 text-lg font-medium">
-                {balance != null ? `$${balance}` : "—"}
-              </p>
+              <div className="shrink-0 text-right">
+                <p className="text-lg font-medium">
+                  {balance != null ? `$${balance}` : "—"}
+                </p>
+                {balance != null ? (
+                  <p className="text-xs text-ink-muted">As of last import</p>
+                ) : null}
+              </div>
               <div className="w-full sm:w-auto">
                 {showHidden ? (
                   <form action={hideAccount}>
@@ -114,12 +117,8 @@ export default async function AccountsPage({
     }
   }
 
-  const visible = rows.filter(
-    (a) => !a.hidden && !isEmptyDuplicateAccount(a, rows),
-  );
-  const hiddenRows = rows.filter(
-    (a) => a.hidden || isEmptyDuplicateAccount(a, rows),
-  );
+  const visible = rows.filter((a) => !a.hidden);
+  const hiddenRows = rows.filter((a) => a.hidden);
 
   const bankAccounts = visible.filter((a) => a.type === "depository");
   const cardAccounts = visible.filter((a) => a.type === "credit");
@@ -132,7 +131,19 @@ export default async function AccountsPage({
       <PageHeader
         title="Accounts"
         description="Import bank and card statements as CSV."
-        action={<AddAccountButton />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://card.apple.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-sm border border-line px-3 py-2 text-sm text-ink-muted hover:bg-bg-elevated"
+            >
+              Apple Card
+            </a>
+            <AddAccountButton />
+          </div>
+        }
       />
 
       {visible.length === 0 && !showHidden ? (
@@ -168,7 +179,7 @@ export default async function AccountsPage({
                 href="/accounts"
                 className="mb-3 inline-block text-sm text-brand-soft hover:underline"
               >
-                Hide empty / hidden accounts
+                Hide hidden accounts
               </a>
               <AccountList title="Hidden" items={hiddenRows} showHidden />
             </>

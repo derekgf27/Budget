@@ -363,6 +363,37 @@ export async function updateTransactionCategory(formData: FormData) {
   revalidateAll();
 }
 
+export async function addManualTransaction(formData: FormData) {
+  const db = getDb();
+  const date = String(formData.get("date") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const amountRaw = String(formData.get("amount") || "").trim();
+  const kind = String(formData.get("kind") || "expense").trim();
+  const accountId = String(formData.get("accountId") || "").trim() || null;
+  const categoryId = String(formData.get("categoryId") || "").trim() || null;
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("Date required");
+  }
+  if (!name) throw new Error("Description required");
+  if (!amountRaw) throw new Error("Amount required");
+
+  let amountCents = Math.abs(dollarsToCents(amountRaw));
+  if (kind === "deposit") amountCents = -amountCents;
+
+  await db.insert(transactions).values({
+    accountId,
+    categoryId: kind === "deposit" ? null : categoryId,
+    date,
+    name,
+    merchantName: null,
+    amountCents,
+    excluded: false,
+    source: "manual",
+  });
+  revalidateAll();
+}
+
 export async function renameAccount(formData: FormData) {
   const db = getDb();
   const id = String(formData.get("id") || "");
@@ -403,7 +434,7 @@ export async function deleteAccount(formData: FormData) {
   revalidateAll();
 }
 
-export async function scanPaychecksFromBank() {
+export async function matchPaychecksFromImports() {
   const { matchPaychecksFromDeposits } = await import("@/lib/paycheck-match");
   const result = await matchPaychecksFromDeposits();
   revalidateAll();

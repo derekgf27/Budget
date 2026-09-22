@@ -171,6 +171,10 @@ export function AccountActions({
                     required
                   />
                 </Field>
+                <p className="text-xs text-ink-muted">
+                  Not live — set from your statement or bank app. Next CSV
+                  import can overwrite this if you include a balance.
+                </p>
                 <button type="submit" className={buttonPrimaryClass}>
                   Save balance
                 </button>

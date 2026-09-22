@@ -46,11 +46,16 @@ function StepMark({ done, n }: { done: boolean; n: number }) {
 
 export function MonthChecklist({
   halfLabel,
+  importDone,
+  hasAccounts,
   uncategorizedCount,
   unpaidBills,
   savingsItems,
 }: {
   halfLabel: string;
+  /** At least one statement imported this check-in half. */
+  importDone: boolean;
+  hasAccounts: boolean;
   uncategorizedCount: number;
   unpaidBills: ChecklistBill[];
   savingsItems: ChecklistSavings[];
@@ -64,7 +69,7 @@ export function MonthChecklist({
   const savingsDone =
     planned.length === 0 || planned.every((s) => s.movedThisHalf);
 
-  const allDone = categorizeDone && billsDone && savingsDone;
+  const allDone = importDone && categorizeDone && billsDone && savingsDone;
 
   async function payBill(formData: FormData) {
     await markBillPaid(formData);
@@ -90,7 +95,30 @@ export function MonthChecklist({
 
       <ol className="mt-4 divide-y divide-rule">
         <li className="flex gap-3 py-3 first:pt-0">
-          <StepMark done={categorizeDone} n={1} />
+          <StepMark done={importDone} n={1} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">Import statement</p>
+            {importDone ? (
+              <p className="mt-1 text-xs text-safe">
+                Statement imported for this half.
+              </p>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-ink-muted">
+                  {hasAccounts
+                    ? "Pull a fresh CSV for this check-in."
+                    : "Add a bank or card with a CSV."}
+                </p>
+                <Link href="/accounts" className={compactBtn}>
+                  {hasAccounts ? "Import" : "Accounts"}
+                </Link>
+              </div>
+            )}
+          </div>
+        </li>
+
+        <li className="flex gap-3 py-3">
+          <StepMark done={categorizeDone} n={2} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Categorize spending</p>
             {categorizeDone ? (
@@ -109,7 +137,7 @@ export function MonthChecklist({
         </li>
 
         <li className="flex gap-3 py-3">
-          <StepMark done={billsDone} n={2} />
+          <StepMark done={billsDone} n={3} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Mark bills this month</p>
             {billsDone ? (
@@ -154,7 +182,7 @@ export function MonthChecklist({
         </li>
 
         <li className="flex gap-3 py-3 last:pb-0">
-          <StepMark done={savingsDone} n={3} />
+          <StepMark done={savingsDone} n={4} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Set aside savings</p>
             {savingsItems.length === 0 ? (
