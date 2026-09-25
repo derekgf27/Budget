@@ -256,7 +256,25 @@ export type TxInput = {
   date: string;
   amountCents: number;
   excluded: boolean;
+  accountId?: string | null;
 };
+
+export type AccountBalanceInput = {
+  id: string;
+  type: string;
+  hidden?: boolean | null;
+  balanceCurrent?: string | number | null;
+};
+
+export function cardBalancesCents(accounts: AccountBalanceInput[]): number {
+  return accounts
+    .filter((a) => a.type === "credit" && !a.hidden)
+    .reduce((sum, a) => {
+      const n = Number(a.balanceCurrent ?? 0);
+      if (!Number.isFinite(n) || n <= 0) return sum;
+      return sum + Math.round(n * 100);
+    }, 0);
+}
 
 export type MoneySplit = {
   periodStart: string;
@@ -272,6 +290,8 @@ export type MoneySplit = {
   billsCents: number;
   savingsCents: number;
   spentCents: number;
+  /** Visible credit-card balances reserved to pay down. */
+  cardBalanceCents: number;
   safeToSpendCents: number;
   incomeByJob: {
     id: string;
@@ -353,6 +373,7 @@ export function computeMoneySplit(
   transactions: TxInput[],
   today = new Date(),
   paycheckLogs: PaycheckLogInput[] = [],
+  accountRows: AccountBalanceInput[] = [],
 ): MoneySplit {
   const todayStart = new Date(
     today.getFullYear(),
@@ -380,6 +401,7 @@ export function computeMoneySplit(
       billsCents: 0,
       savingsCents: 0,
       spentCents: 0,
+      cardBalanceCents: 0,
       safeToSpendCents: 0,
       incomeByJob: [],
       drivers: [
@@ -477,13 +499,20 @@ export function computeMoneySplit(
     0,
   );
 
+  const creditIds = new Set(
+    accountRows.filter((a) => a.type === "credit" && !a.hidden).map((a) => a.id),
+  );
+  const cardBalanceCents = cardBalancesCents(accountRows);
+
   const spentCents = transactions
     .filter((t) => !t.excluded)
     .filter((t) => t.date >= periodStart && t.date <= periodEnd)
     .filter((t) => t.amountCents > 0)
+    .filter((t) => !t.accountId || !creditIds.has(t.accountId))
     .reduce((sum, t) => sum + t.amountCents, 0);
 
-  const safeToSpendCents = incomeCents - billsCents - savingsCents - spentCents;
+  const safeToSpendCents =
+    incomeCents - billsCents - savingsCents - spentCents - cardBalanceCents;
 
   const drivers: MoneySplit["drivers"] = [];
   const unlogged = incomeByJob.filter((j) => !j.logged);
@@ -516,14 +545,21 @@ export function computeMoneySplit(
   }
   if (spentCents > 0) {
     drivers.push({
-      label: "Card spend so far",
+      label: "Cash spend so far",
       amountCents: -spentCents,
+      tone: "neutral",
+    });
+  }
+  if (cardBalanceCents > 0) {
+    drivers.push({
+      label: "Card balances to set aside",
+      amountCents: -cardBalanceCents,
       tone: "neutral",
     });
   }
   if (incomeCents > 0 && safeToSpendCents >= 0) {
     drivers.push({
-      label: "Left after bills, savings, and spend",
+      label: "Left after bills, savings, spend, and cards",
       amountCents: safeToSpendCents,
       tone: "good",
     });
@@ -547,6 +583,7 @@ export function computeMoneySplit(
     billsCents,
     savingsCents,
     spentCents,
+    cardBalanceCents,
     safeToSpendCents,
     incomeByJob,
     drivers,

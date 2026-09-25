@@ -12,12 +12,12 @@ const primaryLinks = [
   { href: "/transactions", label: "Transactions" },
   { href: "/bills", label: "Bills" },
   { href: "/budget", label: "Budget" },
+  { href: "/accounts", label: "Accounts" },
   { href: "/savings", label: "Savings" },
 ];
 
 const moreLinks = [
   { href: "/paychecks", label: "Paychecks" },
-  { href: "/accounts", label: "Accounts" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -101,7 +101,7 @@ export function AppShell({
             </p>
           </div>
 
-          <nav className="hidden items-center gap-5 md:flex" aria-label="Primary">
+          <nav className="hidden items-center gap-3 lg:gap-5 md:flex" aria-label="Primary">
             {primaryLinks.map((link) => (
               <NavLink
                 key={link.href}

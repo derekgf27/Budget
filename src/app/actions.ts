@@ -403,6 +403,46 @@ export async function renameAccount(formData: FormData) {
   revalidateAll();
 }
 
+export async function createManualAccount(formData: FormData) {
+  const db = getDb();
+  const name = String(formData.get("name") || "").trim();
+  const typeRaw = String(formData.get("accountType") || "credit").trim();
+  const type = typeRaw === "depository" ? "depository" : "credit";
+  const raw = String(formData.get("balance") || "").trim();
+  const dueRaw = String(formData.get("dueDate") || "").trim();
+  if (!name) throw new Error("Name required");
+
+  const balanceCurrent = raw === "" ? "0" : raw.replace(/[$,]/g, "");
+  if (!Number.isFinite(Number(balanceCurrent))) {
+    throw new Error("Enter a valid balance");
+  }
+  const balanceDueDate =
+    dueRaw && /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null;
+
+  await db.insert(accounts).values({
+    name,
+    displayName: name,
+    type,
+    subtype: type === "credit" ? "credit card" : "checking",
+    source: "manual",
+    balanceCurrent,
+    balanceDueDate,
+    lastImportedAt: new Date(),
+  });
+  revalidateAll();
+}
+
+export async function updateAccountDueDate(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  const dueRaw = String(formData.get("dueDate") || "").trim();
+  if (!id) throw new Error("Account required");
+  const balanceDueDate =
+    dueRaw && /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null;
+  await db.update(accounts).set({ balanceDueDate }).where(eq(accounts.id, id));
+  revalidateAll();
+}
+
 export async function updateAccountBalance(formData: FormData) {
   const db = getDb();
   const id = String(formData.get("id") || "");
@@ -411,7 +451,39 @@ export async function updateAccountBalance(formData: FormData) {
   const balanceCurrent = raw === "" ? null : raw.replace(/[$,]/g, "");
   await db
     .update(accounts)
-    .set({ balanceCurrent })
+    .set({ balanceCurrent, lastImportedAt: new Date() })
+    .where(eq(accounts.id, id));
+  revalidateAll();
+}
+
+export async function adjustAccountBalance(formData: FormData) {
+  const db = getDb();
+  const id = String(formData.get("id") || "");
+  const direction = String(formData.get("direction") || "").trim();
+  const raw = String(formData.get("amount") || "").trim();
+  if (!id) throw new Error("Account required");
+  if (direction !== "charge" && direction !== "pay") {
+    throw new Error("Choose charge or pay");
+  }
+
+  const delta = Math.abs(dollarsToCents(raw) / 100);
+  if (!Number.isFinite(delta) || delta <= 0) {
+    throw new Error("Enter an amount");
+  }
+
+  const row = (await db.select().from(accounts).where(eq(accounts.id, id)))[0];
+  if (!row) throw new Error("Account not found");
+
+  const current = Number(row.balanceCurrent ?? 0);
+  const next =
+    direction === "charge" ? current + delta : Math.max(0, current - delta);
+
+  await db
+    .update(accounts)
+    .set({
+      balanceCurrent: next.toFixed(2),
+      lastImportedAt: new Date(),
+    })
     .where(eq(accounts.id, id));
   revalidateAll();
 }

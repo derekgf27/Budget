@@ -99,6 +99,8 @@ export const accounts = pgTable("accounts", {
   type: text("type").notNull().default("depository"), // credit | depository | other
   subtype: text("subtype"), // checking | savings | credit card | …
   balanceCurrent: numeric("balance_current", { precision: 12, scale: 2 }),
+  /** YYYY-MM-DD — statement payment due (credit cards). */
+  balanceDueDate: text("balance_due_date"),
   source: text("source").notNull().default("csv"), // csv | manual
   hidden: boolean("hidden").notNull().default(false),
   lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),

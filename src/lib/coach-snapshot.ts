@@ -1,6 +1,7 @@
 import { desc } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+  accounts,
   billPayments,
   bills,
   categories,
@@ -9,6 +10,7 @@ import {
   savingsGoals,
   transactions,
 } from "@/db/schema";
+import { dateFromMonthKey } from "@/components/month-picker";
 import {
   centsToDollars,
   computeMoneySplit,
@@ -24,6 +26,7 @@ export type CoachSnapshot = {
   billsCents: number;
   savingsCents: number;
   spentCents: number;
+  cardBalanceCents: number;
   safeToSpendCents: number;
   incomeByJob: {
     name: string;
@@ -57,11 +60,6 @@ function monthKeyFromDate(d: Date): string {
   return `${y}-${m}`;
 }
 
-function dateFromMonthKey(monthKey: string): Date {
-  const [y, m] = monthKey.split("-").map(Number);
-  return new Date(y, m - 1, 15);
-}
-
 function priorMonthKey(monthKey: string): string {
   const d = dateFromMonthKey(monthKey);
   return monthKeyFromDate(new Date(d.getFullYear(), d.getMonth() - 1, 15));
@@ -77,7 +75,7 @@ export async function buildCoachSnapshot(
   const db = getDb();
   const viewDate = dateFromMonthKey(monthKey);
 
-  const [incomes, billRows, goals, txs, logs, payments, cats] =
+  const [incomes, billRows, goals, txs, logs, payments, cats, accountRows] =
     await Promise.all([
       db.select().from(incomeSources),
       db.select().from(bills),
@@ -86,6 +84,7 @@ export async function buildCoachSnapshot(
       db.select().from(paycheckLogs),
       db.select().from(billPayments),
       db.select().from(categories),
+      db.select().from(accounts),
     ]);
 
   const incomeInputs = incomes.map((i) => ({
@@ -104,6 +103,7 @@ export async function buildCoachSnapshot(
     txs,
     viewDate,
     logs,
+    accountRows,
   );
 
   const spentByCategoryId = new Map<string, number>();
@@ -178,6 +178,7 @@ export async function buildCoachSnapshot(
     txs,
     priorDate,
     logs,
+    accountRows,
   );
 
   return {
@@ -189,6 +190,7 @@ export async function buildCoachSnapshot(
     billsCents: split.billsCents,
     savingsCents: split.savingsCents,
     spentCents: split.spentCents,
+    cardBalanceCents: split.cardBalanceCents,
     safeToSpendCents: split.safeToSpendCents,
     incomeByJob: split.incomeByJob
       .filter((j) => j.fundsWindow)
@@ -218,7 +220,8 @@ export function formatSnapshotForPrompt(s: CoachSnapshot): string {
     `Income logged: ${$(s.incomeCents)}`,
     `Bills reserved: ${$(s.billsCents)}`,
     `Savings planned (both check-ins): ${$(s.savingsCents)}`,
-    `Already spent: ${$(s.spentCents)}`,
+    `Already spent (cash): ${$(s.spentCents)}`,
+    `Card balances to set aside: ${$(s.cardBalanceCents)}`,
     `Left (safe to spend): ${$(s.safeToSpendCents)}`,
   ];
 

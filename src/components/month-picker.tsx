@@ -5,11 +5,18 @@ export function currentMonthKey(d = new Date()): string {
   return formatDate(d).slice(0, 7);
 }
 
-/** Mid-month Date for a YYYY-MM key (stable for half-month bounds). */
-export function dateFromMonthKey(key: string): Date {
+/**
+ * Date to treat as "today" when viewing a YYYY-MM month.
+ * Current month uses the real calendar day so days-left / half are correct.
+ * Past months use the last day (the month is already over).
+ */
+export function dateFromMonthKey(key: string, today = new Date()): Date {
   const [y, m] = key.split("-").map(Number);
-  if (!y || !m) return new Date();
-  return new Date(y, m - 1, 15);
+  if (!y || !m) return today;
+  if (key === currentMonthKey(today)) {
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  }
+  return new Date(y, m, 0);
 }
 
 export function shiftMonthKey(key: string, delta: number): string {

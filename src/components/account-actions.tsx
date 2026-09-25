@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  adjustAccountBalance,
   deleteAccount,
   hideAccount,
   renameAccount,
@@ -21,12 +22,14 @@ type AccountActionsProps = {
   id: string;
   label: string;
   balance: string | null;
+  source?: string;
 };
 
 export function AccountActions({
   id,
   label,
   balance,
+  source,
 }: AccountActionsProps) {
   const router = useRouter();
   const [mode, setMode] = useState<"rename" | "balance" | "import" | null>(null);
@@ -51,13 +54,15 @@ export function AccountActions({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          className={buttonGhostClass}
-          onClick={() => setMode("import")}
-        >
-          Import CSV
-        </button>
+        {source !== "manual" ? (
+          <button
+            type="button"
+            className={buttonGhostClass}
+            onClick={() => setMode("import")}
+          >
+            Import CSV
+          </button>
+        ) : null}
         <button
           type="button"
           className={buttonGhostClass}
@@ -115,7 +120,7 @@ export function AccountActions({
                 {mode === "rename"
                   ? "Rename account"
                   : mode === "balance"
-                    ? "Set balance"
+                    ? "Update balance"
                     : "Import CSV"}
               </h2>
               <button
@@ -153,32 +158,74 @@ export function AccountActions({
             ) : null}
 
             {mode === "balance" ? (
-              <form
-                action={async (fd) => {
-                  await updateAccountBalance(fd);
-                  setMode(null);
-                  router.refresh();
-                }}
-                className="grid gap-3"
-              >
-                <input type="hidden" name="id" value={id} />
-                <Field label="Current balance ($)">
-                  <input
-                    name="balance"
-                    className={inputClass}
-                    defaultValue={balance ?? ""}
-                    placeholder="0.00"
-                    required
-                  />
-                </Field>
-                <p className="text-xs text-ink-muted">
-                  Not live — set from your statement or bank app. Next CSV
-                  import can overwrite this if you include a balance.
+              <div className="grid gap-5">
+                <p className="text-sm text-ink-muted">
+                  Now{" "}
+                  <span className="font-medium text-ink">
+                    ${balance ?? "0.00"}
+                  </span>
+                  . Charge adds to what you owe; Pay subtracts a payment.
                 </p>
-                <button type="submit" className={buttonPrimaryClass}>
-                  Save balance
-                </button>
-              </form>
+                <form
+                  action={async (fd) => {
+                    await adjustAccountBalance(fd);
+                    setMode(null);
+                    router.refresh();
+                  }}
+                  className="grid gap-3"
+                >
+                  <input type="hidden" name="id" value={id} />
+                  <Field label="Amount ($)">
+                    <input
+                      name="amount"
+                      className={inputClass}
+                      placeholder="25.00"
+                      inputMode="decimal"
+                      required
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="submit"
+                      name="direction"
+                      value="charge"
+                      className={buttonPrimaryClass}
+                    >
+                      Charge
+                    </button>
+                    <button
+                      type="submit"
+                      name="direction"
+                      value="pay"
+                      className={buttonGhostClass}
+                    >
+                      Pay
+                    </button>
+                  </div>
+                </form>
+                <form
+                  action={async (fd) => {
+                    await updateAccountBalance(fd);
+                    setMode(null);
+                    router.refresh();
+                  }}
+                  className="grid gap-3 border-t border-line pt-4"
+                >
+                  <input type="hidden" name="id" value={id} />
+                  <Field label="Or set exact balance ($)">
+                    <input
+                      name="balance"
+                      className={inputClass}
+                      defaultValue={balance ?? ""}
+                      placeholder="0.00"
+                      required
+                    />
+                  </Field>
+                  <button type="submit" className={buttonGhostClass}>
+                    Set balance
+                  </button>
+                </form>
+              </div>
             ) : null}
 
             {mode === "import" ? (

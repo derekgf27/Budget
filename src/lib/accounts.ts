@@ -50,3 +50,27 @@ export function formatImportedAt(
     minute: "2-digit",
   });
 }
+
+/** Last day of next calendar month — typical next card due. */
+export function defaultCardDueDate(today = new Date()): string {
+  const d = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function formatDueDate(
+  iso: string | null | undefined,
+  today = new Date(),
+): { label: string; overdue: boolean } | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const [y, m, d] = iso.split("-").map(Number);
+  const due = new Date(y, m - 1, d);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const label = due.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  return { label, overdue: due < todayStart };
+}

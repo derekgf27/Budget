@@ -11,6 +11,7 @@ const base: CoachSnapshot = {
   billsCents: 12131,
   savingsCents: 0,
   spentCents: 30352,
+  cardBalanceCents: 0,
   safeToSpendCents: 21591,
   incomeByJob: [
     { name: "Ciracet", amountCents: 24380, logged: true },

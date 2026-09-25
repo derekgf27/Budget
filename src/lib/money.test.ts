@@ -78,6 +78,13 @@ describe("computeMoneySplit", () => {
     expect(split.billsCents).toBe(150_000);
     expect(split.safeToSpendCents).toBe(320_000 - 150_000 - 40_000 - 4_500);
     expect(split.incomeByJob.every((j) => j.logged && j.fundsWindow)).toBe(true);
+    expect(split.daysLeft).toBe(18);
+  });
+
+  it("counts days remaining from today to month end", () => {
+    const split = computeMoneySplit([], [], [], [], new Date(2026, 8, 25));
+    expect(split.daysLeft).toBe(5);
+    expect(split.half).toBe("late");
   });
 
   it("returns zeros with no incomes", () => {
@@ -85,5 +92,48 @@ describe("computeMoneySplit", () => {
     expect(split.incomeCents).toBe(0);
     expect(split.safeToSpendCents).toBe(0);
     expect(split.periodStart).toBe("2026-09-01");
+  });
+
+  it("reserves credit card balances from safe to spend", () => {
+    const split = computeMoneySplit(
+      [
+        {
+          id: "1",
+          name: "Job A",
+          netAmountCents: 200_000,
+          cadence: "monthly" as Cadence,
+          nextPayday: "2026-09-01",
+        },
+      ],
+      [],
+      [],
+      [
+        {
+          date: "2026-09-05",
+          amountCents: 4_000,
+          excluded: false,
+          accountId: "card-1",
+        },
+      ],
+      new Date(2026, 8, 12),
+      [
+        {
+          incomeSourceId: "1",
+          paidOn: "2026-09-01",
+          amountCents: 200_000,
+        },
+      ],
+      [
+        {
+          id: "card-1",
+          type: "credit",
+          balanceCurrent: "150.00",
+        },
+      ],
+    );
+
+    expect(split.cardBalanceCents).toBe(15_000);
+    expect(split.spentCents).toBe(0);
+    expect(split.safeToSpendCents).toBe(200_000 - 15_000);
   });
 });

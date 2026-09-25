@@ -1,17 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { THEME_STORAGE_KEY } from "@/lib/theme";
+import { THEME_STORAGE_KEY, persistTheme, type ThemeMode } from "@/lib/theme";
 
-export type ThemeMode = "light" | "dark";
+export type { ThemeMode };
 
 export function applyTheme(mode: ThemeMode) {
   document.documentElement.classList.toggle("dark", mode === "dark");
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, mode);
-  } catch {
-    /* ignore */
-  }
+  persistTheme(mode);
 }
 
 export function ThemeToggle({
@@ -23,9 +19,19 @@ export function ThemeToggle({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setMode(
-      document.documentElement.classList.contains("dark") ? "dark" : "light",
-    );
+    let next: ThemeMode = document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light";
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === "dark" || stored === "light") {
+        next = stored;
+        applyTheme(next);
+      }
+    } catch {
+      /* ignore */
+    }
+    setMode(next);
     setReady(true);
   }, []);
 

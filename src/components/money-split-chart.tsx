@@ -78,9 +78,16 @@ export function MoneySplitChart({
     {
       key: "spent",
       label: "Already spent",
-      hint: "After transfers & bill matches",
+      hint: "Cash / bank spend",
       cents: split.spentCents,
       color: "#6e7f76",
+    },
+    {
+      key: "cards",
+      label: "Cards",
+      hint: "Set aside to pay balances",
+      cents: split.cardBalanceCents,
+      color: "#8c4a3a",
     },
     {
       key: "pocket",

@@ -6,6 +6,7 @@ import { MoneySplitChart } from "@/components/money-split-chart";
 import { MonthChecklist } from "@/components/month-checklist";
 import {
   MonthPicker,
+  currentMonthKey,
   dateFromMonthKey,
   resolveMonthKey,
 } from "@/components/month-picker";
@@ -28,7 +29,12 @@ import {
   getSafeSpendGuardrail,
 } from "@/lib/habits";
 import { computeMoneySplit, type Cadence } from "@/lib/money";
-import { accountLabel, formatImportedAt, visibleAccounts } from "@/lib/accounts";
+import {
+  accountLabel,
+  formatDueDate,
+  formatImportedAt,
+  visibleAccounts,
+} from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +106,7 @@ export default async function DashboardPage({
     txs,
     viewDate,
     logs,
+    accountRows,
   );
 
   const paid = new Set(payments.map((p) => `${p.billId}:${p.dueDate}`));
@@ -231,11 +238,13 @@ export default async function DashboardPage({
               <Money cents={split.safeToSpendCents} />
             </p>
             <p className="mt-3 text-sm text-ink-muted">
-              {split.daysLeft === 0
-                ? "Last day of the month"
-                : split.daysLeft === 1
-                  ? "1 day left this month"
-                  : `${split.daysLeft} days left this month`}
+              {monthKey !== currentMonthKey()
+                ? "Looking back at a finished month"
+                : split.daysLeft === 0
+                  ? "Last day of the month"
+                  : split.daysLeft === 1
+                    ? "1 day left this month"
+                    : `${split.daysLeft} days left this month`}
             </p>
             {split.incomeCents === 0 ? (
               <p className="mt-2 text-sm text-ink">
@@ -278,7 +287,7 @@ export default async function DashboardPage({
               </Link>
             </div>
             <p className="mt-1 text-[11px] text-ink-muted">
-              Snapshot from last import — not live.
+              Card balances are reserved from safe to spend.
             </p>
             {accountRowsVisible.length === 0 ? (
               <p className="mt-2 text-sm text-ink-muted">
@@ -297,11 +306,23 @@ export default async function DashboardPage({
                         <span className="block truncate text-ink-muted">
                           {accountLabel(a)}
                         </span>
-                        {imported ? (
-                          <span className="block text-[11px] text-ink-muted/80">
-                            As of {imported}
-                          </span>
-                        ) : null}
+                        <span className="block text-[11px] text-ink-muted/80">
+                          {a.type === "credit"
+                            ? (() => {
+                                const due = formatDueDate(a.balanceDueDate);
+                                if (due) {
+                                  return due.overdue
+                                    ? `Overdue ${due.label}`
+                                    : `Due ${due.label}`;
+                                }
+                                return imported
+                                  ? `You owe · ${imported}`
+                                  : "You owe";
+                              })()
+                            : imported
+                              ? `As of ${imported}`
+                              : ""}
+                        </span>
                       </span>
                       <span className="shrink-0 font-medium tabular-nums">
                         {a.balanceCurrent != null && a.balanceCurrent !== ""

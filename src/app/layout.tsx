@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree, Fraunces } from "next/font/google";
-import { themeBootScript } from "@/lib/theme";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, themeFromCookie } from "@/lib/theme";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -18,17 +19,18 @@ export const metadata: Metadata = {
   description: "Dual-paycheck budgeting with a clear money split",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = themeFromCookie((await cookies()).get(THEME_COOKIE)?.value);
+
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${figtree.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${figtree.variable} ${fraunces.variable} h-full antialiased${
+        theme === "dark" ? " dark" : ""
+      }`}
     >
-      <body className="min-h-full bg-bg text-ink">
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
-        {children}
-      </body>
+      <body className="min-h-full bg-bg text-ink">{children}</body>
     </html>
   );
 }
