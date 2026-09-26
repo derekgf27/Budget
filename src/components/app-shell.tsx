@@ -8,15 +8,15 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const primaryLinks = [
   { href: "/", label: "Home" },
-  { href: "/coach", label: "Coach" },
   { href: "/transactions", label: "Transactions" },
   { href: "/bills", label: "Bills" },
   { href: "/budget", label: "Budget" },
   { href: "/accounts", label: "Accounts" },
-  { href: "/savings", label: "Savings" },
 ];
 
 const moreLinks = [
+  { href: "/coach", label: "Coach" },
+  { href: "/savings", label: "Savings" },
   { href: "/paychecks", label: "Paychecks" },
   { href: "/settings", label: "Settings" },
 ];

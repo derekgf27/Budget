@@ -266,14 +266,30 @@ export type AccountBalanceInput = {
   balanceCurrent?: string | number | null;
 };
 
-export function cardBalancesCents(accounts: AccountBalanceInput[]): number {
+function sumBalancesCents(
+  accounts: AccountBalanceInput[],
+  type: string,
+): number {
   return accounts
-    .filter((a) => a.type === "credit" && !a.hidden)
+    .filter((a) => a.type === type && !a.hidden)
     .reduce((sum, a) => {
       const n = Number(a.balanceCurrent ?? 0);
-      if (!Number.isFinite(n) || n <= 0) return sum;
+      if (!Number.isFinite(n)) return sum;
       return sum + Math.round(n * 100);
     }, 0);
+}
+
+export function cardBalancesCents(accounts: AccountBalanceInput[]): number {
+  return Math.max(0, sumBalancesCents(accounts, "credit"));
+}
+
+export function bankBalancesCents(accounts: AccountBalanceInput[]): number {
+  return sumBalancesCents(accounts, "depository");
+}
+
+/** Cash on hand minus card balances you still owe. */
+export function netBalancesCents(accounts: AccountBalanceInput[]): number {
+  return bankBalancesCents(accounts) - cardBalancesCents(accounts);
 }
 
 export type MoneySplit = {

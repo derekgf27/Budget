@@ -1,18 +1,20 @@
 import { desc, eq } from "drizzle-orm";
-import { AccountActions } from "@/components/account-actions";
 import { AddAccountButton } from "@/components/add-account-button";
 import { AddManualAccountButton } from "@/components/add-manual-account-button";
+import { BankBalanceRow } from "@/components/bank-balance-row";
 import { CardBalanceRow } from "@/components/card-balance-row";
 import { hideAccount } from "@/app/actions";
 import { Money, PageHeader, Panel } from "@/components/ui";
 import { getDb, hasDatabase } from "@/db";
 import { accounts } from "@/db/schema";
-import { accountLabel, formatImportedAt } from "@/lib/accounts";
-import { cardBalancesCents } from "@/lib/money";
+import { accountLabel } from "@/lib/accounts";
+import {
+  bankBalancesCents,
+  cardBalancesCents,
+  netBalancesCents,
+} from "@/lib/money";
 
 export const dynamic = "force-dynamic";
-
-type AccountRow = typeof accounts.$inferSelect;
 
 export default async function AccountsPage({
   searchParams,
@@ -46,14 +48,16 @@ export default async function AccountsPage({
   const visible = rows.filter((a) => !a.hidden);
   const hiddenRows = rows.filter((a) => a.hidden);
   const cards = visible.filter((a) => a.type === "credit");
-  const otherAccounts = visible.filter((a) => a.type !== "credit");
+  const banks = visible.filter((a) => a.type === "depository");
   const reservedCents = cardBalancesCents(visible);
+  const bankCents = bankBalancesCents(visible);
+  const netCents = netBalancesCents(visible);
 
   return (
     <div>
       <PageHeader
         title="Accounts"
-        description="Track card balances. What you owe is reserved from safe to spend."
+        description="Bank cash minus card balances. Cards are also reserved from safe to spend."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <a
@@ -64,22 +68,31 @@ export default async function AccountsPage({
             >
               Apple Card
             </a>
+            <AddManualAccountButton kind="depository" />
             <AddManualAccountButton />
           </div>
         }
       />
 
-      <section className="notebook-sheet notebook-margin mb-6 px-5 py-5">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-muted">
-          Set aside for cards
-        </p>
-        <p className="display mt-2 text-4xl text-brand">
-          <Money cents={reservedCents} />
-        </p>
-        <p className="mt-2 text-sm text-ink-muted">
-          This amount comes out of safe to spend so you can pay the cards by
-          their due dates.
-        </p>
+      <section className="mb-6 notebook-sheet px-5 py-4">
+        <ul className="space-y-2 text-sm">
+          <li className="flex justify-between gap-4 text-ink-muted">
+            <span>In banks</span>
+            <Money cents={bankCents} className="font-medium text-ink" />
+          </li>
+          <li className="flex justify-between gap-4 text-ink-muted">
+            <span>On cards</span>
+            <Money cents={reservedCents} className="font-medium text-ink" />
+          </li>
+          <li className="flex justify-between gap-4 border-t border-line pt-2">
+            <span className="text-ink-muted">After cards</span>
+            <span
+              className={`font-semibold ${netCents < 0 ? "text-danger" : ""}`}
+            >
+              <Money cents={netCents} />
+            </span>
+          </li>
+        </ul>
       </section>
 
       {cards.length === 0 ? (
@@ -108,7 +121,7 @@ export default async function AccountsPage({
                     ? Number(a.balanceCurrent).toFixed(2)
                     : "0.00"
                 }
-                updatedAt={a.lastImportedAt}
+                updatedAt={a.lastBalanceAt ?? a.lastImportedAt}
                 dueDate={a.balanceDueDate}
                 source={a.source}
               />
@@ -117,59 +130,50 @@ export default async function AccountsPage({
         </section>
       )}
 
-      {otherAccounts.length > 0 ? (
-        <details className="mb-8">
-          <summary className="cursor-pointer text-sm text-brand-soft hover:underline">
-            Banks & statement imports ({otherAccounts.length})
-          </summary>
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-bg-elevated/90">
-            {otherAccounts.map((a) => {
-              const label = accountLabel(a);
-              const imported = formatImportedAt(a.lastImportedAt);
-              const balance =
-                a.balanceCurrent != null
-                  ? Number(a.balanceCurrent).toFixed(2)
-                  : null;
-              return (
-                <li
-                  key={a.id}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{label}</p>
-                    <p className="mt-0.5 text-sm text-ink-muted">
-                      {imported ? `Imported ${imported}` : "Bank"}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-lg font-medium">
-                      {balance != null ? `$${balance}` : "—"}
-                    </p>
-                  </div>
-                  <AccountActions
-                    id={a.id}
-                    label={label}
-                    balance={balance}
-                    source={a.source}
-                  />
-                </li>
-              );
-            })}
+      {banks.length === 0 ? (
+        <Panel className="mb-8">
+          <div className="py-8 text-center">
+            <p className="text-ink-muted">No bank balance yet.</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Add Popular and set what you have on hand.
+            </p>
+            <div className="mt-4 flex justify-center">
+              <AddManualAccountButton kind="depository" />
+            </div>
+          </div>
+        </Panel>
+      ) : (
+        <section className="mb-8">
+          <h2 className="display mb-3 text-xl text-brand">Banks</h2>
+          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-bg-elevated/90">
+            {banks.map((a) => (
+              <BankBalanceRow
+                key={a.id}
+                id={a.id}
+                label={accountLabel(a)}
+                balance={
+                  a.balanceCurrent != null
+                    ? Number(a.balanceCurrent).toFixed(2)
+                    : "0.00"
+                }
+                updatedAt={a.lastBalanceAt ?? a.lastImportedAt}
+              />
+            ))}
           </ul>
           <div className="mt-3">
-            <AddAccountButton />
+            <AddManualAccountButton kind="depository" />
           </div>
-        </details>
-      ) : (
-        <details className="mb-8">
-          <summary className="cursor-pointer text-sm text-brand-soft hover:underline">
-            Import a bank statement
-          </summary>
-          <div className="mt-3">
-            <AddAccountButton />
-          </div>
-        </details>
+        </section>
       )}
+
+      <details className="mb-8">
+        <summary className="cursor-pointer text-sm text-brand-soft hover:underline">
+          Import a statement CSV
+        </summary>
+        <div className="mt-3">
+          <AddAccountButton />
+        </div>
+      </details>
 
       {hiddenRows.length > 0 ? (
         <div className="mt-2">

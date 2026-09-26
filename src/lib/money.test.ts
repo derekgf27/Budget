@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeMoneySplit, halfMonthBounds, type Cadence } from "./money";
+import {
+  bankBalancesCents,
+  computeMoneySplit,
+  halfMonthBounds,
+  netBalancesCents,
+  type Cadence,
+} from "./money";
 
 describe("halfMonthBounds", () => {
   it("uses 1st half on the 12th", () => {
@@ -135,5 +141,16 @@ describe("computeMoneySplit", () => {
     expect(split.cardBalanceCents).toBe(15_000);
     expect(split.spentCents).toBe(0);
     expect(split.safeToSpendCents).toBe(200_000 - 15_000);
+  });
+});
+
+describe("netBalancesCents", () => {
+  it("subtracts card balances from bank cash", () => {
+    const rows = [
+      { id: "b", type: "depository", balanceCurrent: "500.00" },
+      { id: "c", type: "credit", balanceCurrent: "120.00" },
+    ];
+    expect(bankBalancesCents(rows)).toBe(50_000);
+    expect(netBalancesCents(rows)).toBe(38_000);
   });
 });

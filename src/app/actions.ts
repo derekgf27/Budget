@@ -423,11 +423,17 @@ export async function createManualAccount(formData: FormData) {
     name,
     displayName: name,
     type,
-    subtype: type === "credit" ? "credit card" : "checking",
+    subtype:
+      type === "credit"
+        ? "credit card"
+        : name.toLowerCase().includes("savings") ||
+            name.toLowerCase().includes("ahorros")
+          ? "savings"
+          : "checking",
     source: "manual",
     balanceCurrent,
     balanceDueDate,
-    lastImportedAt: new Date(),
+    lastBalanceAt: new Date(),
   });
   revalidateAll();
 }
@@ -451,7 +457,7 @@ export async function updateAccountBalance(formData: FormData) {
   const balanceCurrent = raw === "" ? null : raw.replace(/[$,]/g, "");
   await db
     .update(accounts)
-    .set({ balanceCurrent, lastImportedAt: new Date() })
+        .set({ balanceCurrent, lastBalanceAt: new Date() })
     .where(eq(accounts.id, id));
   revalidateAll();
 }
@@ -482,7 +488,7 @@ export async function adjustAccountBalance(formData: FormData) {
     .update(accounts)
     .set({
       balanceCurrent: next.toFixed(2),
-      lastImportedAt: new Date(),
+      lastBalanceAt: new Date(),
     })
     .where(eq(accounts.id, id));
   revalidateAll();

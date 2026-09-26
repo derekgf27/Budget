@@ -28,7 +28,7 @@ import {
   getPaydayReminders,
   getSafeSpendGuardrail,
 } from "@/lib/habits";
-import { computeMoneySplit, type Cadence } from "@/lib/money";
+import { computeMoneySplit, netBalancesCents, type Cadence } from "@/lib/money";
 import {
   accountLabel,
   formatDueDate,
@@ -199,8 +199,12 @@ export default async function DashboardPage({
   );
 
   const accountRowsVisible = visibleAccounts(accountRows);
-  const hasAccounts = accountRowsVisible.length > 0;
-  const importDone = accountRowsVisible.some((a) => {
+  const netCashCents = netBalancesCents(accountRowsVisible);
+  const csvAccounts = accountRowsVisible.filter(
+    (a) => a.source === "csv" && a.type === "depository",
+  );
+  const hasCsvAccounts = csvAccounts.length > 0;
+  const importDone = csvAccounts.some((a) => {
     if (!a.lastImportedAt) return false;
     const d =
       a.lastImportedAt instanceof Date
@@ -214,7 +218,7 @@ export default async function DashboardPage({
     <div>
       <PageHeader
         title={split.monthLabel}
-        description={`${split.halfLabel} check-in · import, categorize, bills, savings.`}
+        description={`${split.halfLabel} check-in · leftover after bills and cards.`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <MonthPicker monthKey={monthKey} basePath="/" />
@@ -254,13 +258,36 @@ export default async function DashboardPage({
               <p className="mt-2 text-sm text-danger">
                 Plans exceed income — trim bills/savings or log more pay.
               </p>
+            ) : accountRowsVisible.some((a) => a.type === "credit") ? (
+              <p className="mt-3 text-sm text-ink-muted">
+                After cards{" "}
+                <span
+                  className={`font-medium tabular-nums ${
+                    netCashCents < 0 ? "text-danger" : "text-ink"
+                  }`}
+                >
+                  <Money cents={netCashCents} />
+                </span>
+                <span className="text-ink-muted">
+                  {" "}
+                  left in the bank if you paid them today.
+                </span>
+              </p>
             ) : null}
           </section>
+
+          <HomeAlerts
+            reminders={paydayReminders}
+            jobs={jobOptions}
+            safe={safeGuardrail}
+            categories={categoryGuardrails}
+            monthKey={monthKey}
+          />
 
           <MonthChecklist
             halfLabel={split.halfLabel}
             importDone={importDone}
-            hasAccounts={hasAccounts}
+            hasCsvAccounts={hasCsvAccounts}
             uncategorizedCount={uncategorizedCount}
             unpaidBills={unpaidThisMonth}
             savingsItems={savingsItems}
@@ -286,17 +313,16 @@ export default async function DashboardPage({
                 Accounts
               </Link>
             </div>
-            <p className="mt-1 text-[11px] text-ink-muted">
-              Card balances are reserved from safe to spend.
-            </p>
             {accountRowsVisible.length === 0 ? (
               <p className="mt-2 text-sm text-ink-muted">
-                Import a statement on Accounts.
+                Add Popular or a card on Accounts.
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
                 {accountRowsVisible.map((a) => {
-                  const imported = formatImportedAt(a.lastImportedAt);
+                  const updated = formatImportedAt(
+                    a.lastBalanceAt ?? a.lastImportedAt,
+                  );
                   return (
                     <li
                       key={a.id}
@@ -315,13 +341,11 @@ export default async function DashboardPage({
                                     ? `Overdue ${due.label}`
                                     : `Due ${due.label}`;
                                 }
-                                return imported
-                                  ? `You owe · ${imported}`
-                                  : "You owe";
+                                return "You owe";
                               })()
-                            : imported
-                              ? `As of ${imported}`
-                              : ""}
+                            : updated
+                              ? `Updated ${updated}`
+                              : "Cash on hand"}
                         </span>
                       </span>
                       <span className="shrink-0 font-medium tabular-nums">
@@ -337,14 +361,6 @@ export default async function DashboardPage({
           </section>
         </div>
       </div>
-
-      <HomeAlerts
-        reminders={paydayReminders}
-        jobs={jobOptions}
-        safe={safeGuardrail}
-        categories={categoryGuardrails}
-        monthKey={monthKey}
-      />
     </div>
   );
 }

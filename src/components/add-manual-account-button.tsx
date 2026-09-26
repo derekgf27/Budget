@@ -11,7 +11,11 @@ import {
 } from "@/components/ui";
 import { defaultCardDueDate } from "@/lib/accounts";
 
-export function AddManualAccountButton() {
+export function AddManualAccountButton({
+  kind = "credit",
+}: {
+  kind?: "credit" | "depository";
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,7 +59,7 @@ export function AddManualAccountButton() {
         className={buttonGhostClass}
         onClick={() => setOpen(true)}
       >
-        Track card
+        {kind === "depository" ? "Track bank" : "Track card"}
       </button>
 
       {open ? (
@@ -78,11 +82,12 @@ export function AddManualAccountButton() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 id={titleId} className="display text-2xl text-brand">
-                  Track a card
+                  {kind === "depository" ? "Track a bank" : "Track a card"}
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  What you still owe this cycle — due date is when it must be
-                  paid.
+                  {kind === "depository"
+                    ? "Cash on hand you can update whenever the bank app changes."
+                    : "What you still owe this cycle — due date is when it must be paid."}
                 </p>
               </div>
               <button
@@ -96,16 +101,29 @@ export function AddManualAccountButton() {
             </div>
 
             <form action={save} className="grid gap-3">
-              <input type="hidden" name="accountType" value="credit" />
-              <Field label="Card name">
+              <input type="hidden" name="accountType" value={kind} />
+              <Field label={kind === "depository" ? "Bank name" : "Card name"}>
                 <input
                   name="name"
                   className={inputClass}
-                  placeholder="e.g. Store card"
+                  placeholder={
+                    kind === "depository"
+                      ? "e.g. Popular checking"
+                      : "e.g. Store card"
+                  }
+                  defaultValue={
+                    kind === "depository" ? "Popular checking" : ""
+                  }
                   required
                 />
               </Field>
-              <Field label="What you owe this cycle ($)">
+              <Field
+                label={
+                  kind === "depository"
+                    ? "Balance now ($)"
+                    : "What you owe this cycle ($)"
+                }
+              >
                 <input
                   name="balance"
                   className={inputClass}
@@ -114,22 +132,28 @@ export function AddManualAccountButton() {
                   defaultValue="0"
                 />
               </Field>
-              <Field label="Due date">
-                <input
-                  name="dueDate"
-                  type="date"
-                  className={inputClass}
-                  defaultValue={defaultCardDueDate()}
-                  required
-                />
-              </Field>
+              {kind === "credit" ? (
+                <Field label="Due date">
+                  <input
+                    name="dueDate"
+                    type="date"
+                    className={inputClass}
+                    defaultValue={defaultCardDueDate()}
+                    required
+                  />
+                </Field>
+              ) : null}
               {error ? <p className="text-sm text-danger">{error}</p> : null}
               <button
                 type="submit"
                 disabled={busy}
                 className={buttonPrimaryClass}
               >
-                {busy ? "Saving…" : "Add card"}
+                {busy
+                  ? "Saving…"
+                  : kind === "depository"
+                    ? "Add bank"
+                    : "Add card"}
               </button>
             </form>
           </div>

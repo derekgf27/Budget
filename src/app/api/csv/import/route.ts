@@ -127,6 +127,7 @@ export async function POST(request: Request) {
         source: "csv",
         balanceCurrent: balanceCurrent ?? null,
         lastImportedAt: importedAt,
+        ...(balanceCurrent !== undefined ? { lastBalanceAt: importedAt } : {}),
       })
       .returning();
     account = inserted[0];
@@ -134,7 +135,9 @@ export async function POST(request: Request) {
     await db
       .update(accounts)
       .set({
-        ...(balanceCurrent !== undefined ? { balanceCurrent } : {}),
+        ...(balanceCurrent !== undefined
+          ? { balanceCurrent, lastBalanceAt: importedAt }
+          : {}),
         lastImportedAt: importedAt,
         ...(account.source === "csv" && !account.displayName
           ? {

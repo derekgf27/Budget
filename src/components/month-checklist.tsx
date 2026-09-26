@@ -26,8 +26,6 @@ type ChecklistSavings = {
 
 const compactBtn =
   "rounded-sm bg-nav px-2.5 py-1 text-xs font-medium text-white hover:opacity-90";
-const compactGhost =
-  "rounded-sm border border-line px-2.5 py-1 text-xs text-ink hover:bg-bg-elevated";
 
 function StepMark({ done, n }: { done: boolean; n: number }) {
   return (
@@ -47,15 +45,15 @@ function StepMark({ done, n }: { done: boolean; n: number }) {
 export function MonthChecklist({
   halfLabel,
   importDone,
-  hasAccounts,
+  hasCsvAccounts,
   uncategorizedCount,
   unpaidBills,
   savingsItems,
 }: {
   halfLabel: string;
-  /** At least one statement imported this check-in half. */
+  /** A CSV statement was imported this half — not a manual balance edit. */
   importDone: boolean;
-  hasAccounts: boolean;
+  hasCsvAccounts: boolean;
   uncategorizedCount: number;
   unpaidBills: ChecklistBill[];
   savingsItems: ChecklistSavings[];
@@ -63,13 +61,20 @@ export function MonthChecklist({
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
 
+  const showImport = hasCsvAccounts;
+  const planned = savingsItems.filter((s) => s.plannedCents > 0);
+  const showSavings = planned.length > 0;
   const categorizeDone = uncategorizedCount === 0;
   const billsDone = unpaidBills.length === 0;
-  const planned = savingsItems.filter((s) => s.plannedCents > 0);
-  const savingsDone =
-    planned.length === 0 || planned.every((s) => s.movedThisHalf);
+  const savingsDone = planned.every((s) => s.movedThisHalf);
 
-  const allDone = importDone && categorizeDone && billsDone && savingsDone;
+  const allDone =
+    (!showImport || importDone) &&
+    categorizeDone &&
+    billsDone &&
+    (!showSavings || savingsDone);
+
+  let step = 1;
 
   async function payBill(formData: FormData) {
     await markBillPaid(formData);
@@ -94,31 +99,31 @@ export function MonthChecklist({
       </div>
 
       <ol className="mt-4 divide-y divide-rule">
-        <li className="flex gap-3 py-3 first:pt-0">
-          <StepMark done={importDone} n={1} />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Import statement</p>
-            {importDone ? (
-              <p className="mt-1 text-xs text-safe">
-                Statement imported for this half.
-              </p>
-            ) : (
-              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-ink-muted">
-                  {hasAccounts
-                    ? "Pull a fresh CSV for this check-in."
-                    : "Add a bank or card with a CSV."}
+        {showImport ? (
+          <li className="flex gap-3 py-3 first:pt-0">
+            <StepMark done={importDone} n={step++} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Import statement</p>
+              {importDone ? (
+                <p className="mt-1 text-xs text-safe">
+                  CSV imported for this half.
                 </p>
-                <Link href="/accounts" className={compactBtn}>
-                  {hasAccounts ? "Import" : "Accounts"}
-                </Link>
-              </div>
-            )}
-          </div>
-        </li>
+              ) : (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-ink-muted">
+                    Pull a fresh CSV — saving a balance doesn’t count.
+                  </p>
+                  <Link href="/accounts" className={compactBtn}>
+                    Import
+                  </Link>
+                </div>
+              )}
+            </div>
+          </li>
+        ) : null}
 
-        <li className="flex gap-3 py-3">
-          <StepMark done={categorizeDone} n={2} />
+        <li className="flex gap-3 py-3 first:pt-0">
+          <StepMark done={categorizeDone} n={step++} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Categorize spending</p>
             {categorizeDone ? (
@@ -137,7 +142,7 @@ export function MonthChecklist({
         </li>
 
         <li className="flex gap-3 py-3">
-          <StepMark done={billsDone} n={3} />
+          <StepMark done={billsDone} n={step++} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">Mark bills this month</p>
             {billsDone ? (
@@ -181,64 +186,56 @@ export function MonthChecklist({
           </div>
         </li>
 
-        <li className="flex gap-3 py-3 last:pb-0">
-          <StepMark done={savingsDone} n={4} />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">Set aside savings</p>
-            {savingsItems.length === 0 ? (
-              <p className="mt-1 text-xs text-ink-muted">No savings goals yet.</p>
-            ) : savingsDone && planned.length > 0 ? (
-              <p className="mt-1 text-xs text-safe">Savings moved for this half.</p>
-            ) : (
-              <ul className="mt-1.5 space-y-2">
-                {savingsItems.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-2"
-                  >
-                    <p className="text-xs font-medium">{item.name}</p>
-                    {item.movedThisHalf && item.plannedCents > 0 ? (
-                      <span className="text-xs text-safe">Moved</span>
-                    ) : item.plannedCents > 0 ? (
-                      <form action={moveSavings}>
-                        <input type="hidden" name="savingsId" value={item.id} />
-                        <input type="hidden" name="direction" value="deposit" />
-                        <input
-                          type="hidden"
-                          name="amount"
-                          value={(item.plannedCents / 100).toFixed(2)}
-                        />
-                        <input type="hidden" name="transferredOn" value={today} />
-                        <input type="hidden" name="note" value="Month check-in" />
-                        <button type="submit" className={compactBtn}>
-                          Move <Money cents={item.plannedCents} />
-                        </button>
-                      </form>
-                    ) : (
-                      <form
-                        action={moveSavings}
-                        className="flex items-center gap-1.5"
-                      >
-                        <input type="hidden" name="savingsId" value={item.id} />
-                        <input type="hidden" name="direction" value="deposit" />
-                        <input type="hidden" name="transferredOn" value={today} />
-                        <input
-                          name="amount"
-                          required
-                          placeholder="$"
-                          className="w-16 rounded-sm border border-line bg-paper px-1.5 py-1 text-xs"
-                        />
-                        <button type="submit" className={compactGhost}>
-                          Add
-                        </button>
-                      </form>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </li>
+        {showSavings ? (
+          <li className="flex gap-3 py-3 last:pb-0">
+            <StepMark done={savingsDone} n={step++} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Set aside savings</p>
+              {savingsDone ? (
+                <p className="mt-1 text-xs text-safe">
+                  Savings moved for this half.
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-2">
+                  {planned.map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <p className="text-xs font-medium">{item.name}</p>
+                      {item.movedThisHalf ? (
+                        <span className="text-xs text-safe">Moved</span>
+                      ) : (
+                        <form action={moveSavings}>
+                          <input type="hidden" name="savingsId" value={item.id} />
+                          <input type="hidden" name="direction" value="deposit" />
+                          <input
+                            type="hidden"
+                            name="amount"
+                            value={(item.plannedCents / 100).toFixed(2)}
+                          />
+                          <input
+                            type="hidden"
+                            name="transferredOn"
+                            value={today}
+                          />
+                          <input
+                            type="hidden"
+                            name="note"
+                            value="Month check-in"
+                          />
+                          <button type="submit" className={compactBtn}>
+                            Move <Money cents={item.plannedCents} />
+                          </button>
+                        </form>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </li>
+        ) : null}
       </ol>
     </section>
   );

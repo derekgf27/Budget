@@ -104,6 +104,7 @@ export const accounts = pgTable("accounts", {
   source: text("source").notNull().default("csv"), // csv | manual
   hidden: boolean("hidden").notNull().default(false),
   lastImportedAt: timestamp("last_imported_at", { withTimezone: true }),
+  lastBalanceAt: timestamp("last_balance_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -62,14 +62,14 @@ function AlertRow({
 
   return (
     <li
-      className={`flex flex-wrap items-start justify-between gap-3 border-t border-line px-1 py-3 first:border-t-0 first:pt-0 ${
+      className={`flex flex-wrap items-start justify-between gap-2 border-t border-line px-1 py-2 first:border-t-0 first:pt-0 ${
         tone === "warn" ? "border-l-[3px] border-l-danger pl-3" : ""
       }`}
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{title}</p>
         <div className="mt-1 text-sm text-ink">{body}</div>
-        {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
+        {actions ? <div className="mt-2 flex flex-wrap gap-2">{actions}</div> : null}
       </div>
       <button
         type="button"
@@ -102,7 +102,7 @@ export function HomeAlerts({
 
   return (
     <section
-      className="notebook-sheet mt-6 hidden px-5 py-4 has-[li]:block"
+      className="notebook-sheet hidden px-4 py-3 has-[li]:block"
       aria-label="Alerts"
     >
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-muted">
@@ -173,23 +173,27 @@ export function HomeAlerts({
           />
         ) : null}
 
-        {categories.map((c) => (
+        {categories.length > 0 ? (
           <AlertRow
-            key={`cat-${c.categoryId}`}
-            storageKey={`splitbook:home-alert:cat:${monthKey}:${c.categoryId}:${c.over ? "over" : "warn"}`}
+            storageKey={`splitbook:home-alert:cats:${monthKey}:${categories
+              .map((c) => `${c.categoryId}:${c.over ? "o" : "w"}`)
+              .join(",")}`}
             tone="warn"
             title={
-              c.over
-                ? `${c.name} is over budget`
-                : `${c.name} is at ${c.pct}% of its limit`
+              categories.filter((c) => c.over).length === categories.length
+                ? `${categories.length} ${
+                    categories.length === 1 ? "category is" : "categories are"
+                  } over budget`
+                : `${categories.length} ${
+                    categories.length === 1 ? "category" : "categories"
+                  } near or over limit`
             }
             body={
               <>
-                <Money cents={c.spentCents} /> of{" "}
-                <Money cents={c.limitCents} />
-                {c.over
-                  ? " — pause or reallocate."
-                  : " — soft guardrail at 80%."}
+                {categories
+                  .map((c) => `${c.name} ${c.pct}%`)
+                  .join(" · ")}
+                . Pause or reallocate on Budget.
               </>
             }
             actions={
@@ -201,7 +205,7 @@ export function HomeAlerts({
               </Link>
             }
           />
-        ))}
+        ) : null}
       </ul>
     </section>
   );
